@@ -125,7 +125,7 @@ class Snapshot:
     """Everything one run observed and concluded; the input of every renderer.
 
     ``probe_failures`` collects the failures of every collector in one place, so a report
-    can list what could not be checked. Interpreter facts join as their collector is added.
+    can list what could not be checked.
     """
 
     tool_version: str
@@ -135,6 +135,7 @@ class Snapshot:
     nvidia: NvidiaFacts | None = None
     toolkit: ToolkitFacts | None = None
     cuda_environment: tuple[EnvironmentVariable, ...] = ()
+    interpreters: tuple[InterpreterFacts, ...] = ()
     probe_failures: tuple[ProbeFailure, ...] = ()
     findings: tuple[Finding, ...] = ()
 
