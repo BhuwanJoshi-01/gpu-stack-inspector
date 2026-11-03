@@ -94,6 +94,8 @@ SCHEMA_DEFS = {
     models.Evidence: SCHEMA["$defs"]["evidence"],
     TorchBuild: SCHEMA["$defs"]["torch_build"],
     models.RedactionCount: SCHEMA["$defs"]["redaction_count"],
+    models.RuntimeFacts: SCHEMA["$defs"]["runtime"],
+    models.RuntimeStep: SCHEMA["$defs"]["runtime_step"],
 }
 DERIVED = {
     models.InterpreterFacts: {"virtualenv", "torch_build"},
