@@ -174,3 +174,51 @@ def test_a_finished_command_whose_child_keeps_the_pipe_open_does_not_hang() -> N
     assert result.outcome is Outcome.OK
     assert result.stdout.strip() == "parent done"
     assert time.monotonic() - started < 8
+
+
+def test_output_cap_must_be_positive() -> None:
+    from gpu_stack_inspector.runner import SubprocessRunner
+
+    with pytest.raises(ValueError, match="max_output"):
+        SubprocessRunner(max_output=0)
+
+
+@posix_only
+def test_a_file_that_is_not_a_program_is_an_os_error(tmp_path: Path) -> None:
+    garbage = tmp_path / "garbage"
+    garbage.write_bytes(b"\x00\x01\x02 not a program")
+    garbage.chmod(0o755)
+    result = run([str(garbage)])
+    assert result.outcome is Outcome.OS_ERROR
+    assert result.error
+
+
+@posix_only
+def test_ctrl_c_while_waiting_kills_the_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import subprocess
+
+    pid_file = tmp_path / "command.pid"
+    real_wait = subprocess.Popen.wait
+
+    def interrupted_wait(self: subprocess.Popen[bytes], timeout: float | None = None) -> int:
+        deadline = time.monotonic() + 5
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        monkeypatch.setattr(subprocess.Popen, "wait", real_wait)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(subprocess.Popen, "wait", interrupted_wait)
+    code = f"import os, time; open({str(pid_file)!r}, 'w').write(str(os.getpid())); time.sleep(60)"
+    with pytest.raises(KeyboardInterrupt):
+        run([PY, "-c", code], timeout=30)
+    pid = int(pid_file.read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    pytest.fail(f"command {pid} kept running (or was never reaped) after Ctrl+C")

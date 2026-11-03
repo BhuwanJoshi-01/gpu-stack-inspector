@@ -179,8 +179,11 @@ class SubprocessRunner:
             for reader in readers:
                 reader.join(max(0.0, deadline - time.monotonic()))
         except BaseException:
-            # Ctrl+C or an internal error: never leave the command running behind us.
+            # Ctrl+C or an internal error: never leave the command running behind us,
+            # and reap it so it does not linger as a zombie.
             _kill(proc)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                proc.wait(timeout=_REAP_TIMEOUT)
             raise
 
         out, err = readers
