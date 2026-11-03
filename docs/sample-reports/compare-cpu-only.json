@@ -1,0 +1,856 @@
+{
+  "tool_version": "0.1.0",
+  "created_at": "2026-11-03T14:11:09Z",
+  "schema_version": 1,
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "kernel": "7.0.0-42-generic",
+    "distribution": "Ubuntu 26.04.1 LTS",
+    "wsl": false
+  },
+  "nvidia": {
+    "smi_path": "/usr/bin/nvidia-smi",
+    "driver_version": "595.99.02",
+    "max_cuda_version": "13.2",
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+        "memory_total_mib": 4096,
+        "compute_capability": "8.6"
+      }
+    ],
+    "failures": []
+  },
+  "toolkit": {
+    "nvcc_path": "/usr/bin/nvcc",
+    "nvcc_version": "12.4.131",
+    "toolkits": [],
+    "failures": []
+  },
+  "cuda_environment": [],
+  "interpreters": [
+    {
+      "label": "A",
+      "path": "~/envs/sapiens2/bin/python",
+      "executable": "~/envs/sapiens2/bin/python",
+      "version": "3.13.13",
+      "implementation": "cpython",
+      "prefix": "~/envs/sapiens2",
+      "base_prefix": "~/envs/sapiens2",
+      "conda": true,
+      "platform": "linux-x86_64",
+      "user_site": true,
+      "pythonpath_set": false,
+      "distributions": [
+        {
+          "name": "accelerate",
+          "version": "1.13.0",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "numpy",
+          "version": "2.4.4",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cublas-cu12",
+          "version": "12.8.4.1",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cuda-cupti-cu12",
+          "version": "12.8.90",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cuda-nvrtc-cu12",
+          "version": "12.8.93",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cuda-runtime-cu12",
+          "version": "12.8.90",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cudnn-cu12",
+          "version": "9.19.0.56",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cufft-cu12",
+          "version": "11.3.3.83",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cufile-cu12",
+          "version": "1.13.1.3",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-curand-cu12",
+          "version": "10.3.9.90",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cusolver-cu12",
+          "version": "11.7.3.90",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cusparse-cu12",
+          "version": "12.5.8.93",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-cusparselt-cu12",
+          "version": "0.7.1",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-nccl-cu12",
+          "version": "2.28.9",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-nvjitlink-cu12",
+          "version": "12.8.93",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-nvshmem-cu12",
+          "version": "3.4.5",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "nvidia-nvtx-cu12",
+          "version": "12.8.90",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "torch",
+          "version": "2.11.0+cu128",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "torchvision",
+          "version": "0.26.0+cu128",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        },
+        {
+          "name": "triton",
+          "version": "3.6.0",
+          "location": "~/envs/sapiens2/lib/python3.13/site-packages"
+        }
+      ],
+      "torch": {
+        "version": "2.11.0+cu128",
+        "location": "~/envs/sapiens2/lib/python3.13/site-packages",
+        "requires_nvidia": [
+          "nvidia-cudnn-cu12",
+          "nvidia-cusparselt-cu12",
+          "nvidia-nccl-cu12",
+          "nvidia-nvshmem-cu12"
+        ],
+        "cuda_library": true,
+        "hip_library": false,
+        "version_py_found": true,
+        "built_cuda": "12.8",
+        "built_hip": null,
+        "conda_records": []
+      },
+      "runtime": null,
+      "failures": [],
+      "virtualenv": false,
+      "torch_build": {
+        "kind": "cuda",
+        "confidence": "high",
+        "cuda_version": "12.8",
+        "evidence": [
+          {
+            "source": "torch-metadata",
+            "key": "version",
+            "value": "2.11.0+cu128"
+          },
+          {
+            "source": "torch/version.py",
+            "key": "cuda",
+            "value": "12.8"
+          },
+          {
+            "source": "torch/version.py",
+            "key": "hip",
+            "value": "None"
+          },
+          {
+            "source": "torch/lib",
+            "key": "cuda_library",
+            "value": "present"
+          },
+          {
+            "source": "torch/lib",
+            "key": "hip_library",
+            "value": "absent"
+          },
+          {
+            "source": "torch-metadata",
+            "key": "requires_nvidia",
+            "value": "nvidia-cudnn-cu12, nvidia-cusparselt-cu12, nvidia-nccl-cu12, nvidia-nvshmem-cu12"
+          }
+        ],
+        "conflicts": []
+      }
+    },
+    {
+      "label": "B",
+      "path": "~/envs/cpu-venv/bin/python",
+      "executable": "~/envs/cpu-venv/bin/python",
+      "version": "3.12.13",
+      "implementation": "cpython",
+      "prefix": "~/envs/cpu-venv",
+      "base_prefix": "~/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu",
+      "conda": false,
+      "platform": "linux-x86_64",
+      "user_site": false,
+      "pythonpath_set": false,
+      "distributions": [
+        {
+          "name": "torch",
+          "version": "2.15.0+cpu",
+          "location": "~/envs/cpu-venv/lib/python3.12/site-packages"
+        }
+      ],
+      "torch": {
+        "version": "2.15.0+cpu",
+        "location": "~/envs/cpu-venv/lib/python3.12/site-packages",
+        "requires_nvidia": [],
+        "cuda_library": false,
+        "hip_library": false,
+        "version_py_found": true,
+        "built_cuda": null,
+        "built_hip": null,
+        "conda_records": null
+      },
+      "runtime": null,
+      "failures": [],
+      "virtualenv": true,
+      "torch_build": {
+        "kind": "cpu",
+        "confidence": "high",
+        "cuda_version": null,
+        "evidence": [
+          {
+            "source": "torch-metadata",
+            "key": "version",
+            "value": "2.15.0+cpu"
+          },
+          {
+            "source": "torch/version.py",
+            "key": "cuda",
+            "value": "None"
+          },
+          {
+            "source": "torch/version.py",
+            "key": "hip",
+            "value": "None"
+          },
+          {
+            "source": "torch/lib",
+            "key": "cuda_library",
+            "value": "absent"
+          },
+          {
+            "source": "torch/lib",
+            "key": "hip_library",
+            "value": "absent"
+          }
+        ],
+        "conflicts": []
+      }
+    }
+  ],
+  "comparison": [
+    {
+      "field": "Python",
+      "values": [
+        "3.13.13",
+        "3.12.13"
+      ],
+      "differs": true
+    },
+    {
+      "field": "implementation",
+      "values": [
+        "cpython",
+        "cpython"
+      ],
+      "differs": false
+    },
+    {
+      "field": "conda env",
+      "values": [
+        "yes",
+        "no"
+      ],
+      "differs": true
+    },
+    {
+      "field": "venv",
+      "values": [
+        "no",
+        "yes"
+      ],
+      "differs": true
+    },
+    {
+      "field": "platform",
+      "values": [
+        "linux-x86_64",
+        "linux-x86_64"
+      ],
+      "differs": false
+    },
+    {
+      "field": "user site",
+      "values": [
+        "yes",
+        "no"
+      ],
+      "differs": true
+    },
+    {
+      "field": "PYTHONPATH set",
+      "values": [
+        "no",
+        "no"
+      ],
+      "differs": false
+    },
+    {
+      "field": "torch",
+      "values": [
+        "2.11.0+cu128",
+        "2.15.0+cpu"
+      ],
+      "differs": true
+    },
+    {
+      "field": "torch build",
+      "values": [
+        "CUDA 12.8",
+        "CPU only"
+      ],
+      "differs": true
+    },
+    {
+      "field": "torch location",
+      "values": [
+        "~/envs/sapiens2/lib/python3.13/site-packages",
+        "~/envs/cpu-venv/lib/python3.12/site-packages"
+      ],
+      "differs": true
+    },
+    {
+      "field": "accelerate",
+      "values": [
+        "1.13.0",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "numpy",
+      "values": [
+        "2.4.4",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cublas-cu12",
+      "values": [
+        "12.8.4.1",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cuda-cupti-cu12",
+      "values": [
+        "12.8.90",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cuda-nvrtc-cu12",
+      "values": [
+        "12.8.93",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cuda-runtime-cu12",
+      "values": [
+        "12.8.90",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cudnn-cu12",
+      "values": [
+        "9.19.0.56",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cufft-cu12",
+      "values": [
+        "11.3.3.83",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cufile-cu12",
+      "values": [
+        "1.13.1.3",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-curand-cu12",
+      "values": [
+        "10.3.9.90",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cusolver-cu12",
+      "values": [
+        "11.7.3.90",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cusparse-cu12",
+      "values": [
+        "12.5.8.93",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-cusparselt-cu12",
+      "values": [
+        "0.7.1",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-nccl-cu12",
+      "values": [
+        "2.28.9",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-nvjitlink-cu12",
+      "values": [
+        "12.8.93",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-nvshmem-cu12",
+      "values": [
+        "3.4.5",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "nvidia-nvtx-cu12",
+      "values": [
+        "12.8.90",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "torchvision",
+      "values": [
+        "0.26.0+cu128",
+        null
+      ],
+      "differs": true
+    },
+    {
+      "field": "triton",
+      "values": [
+        "3.6.0",
+        null
+      ],
+      "differs": true
+    }
+  ],
+  "probe_failures": [],
+  "findings": [
+    {
+      "id": "GSI-SYS-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "nvidia-smi is installed",
+      "reason": "Found at /usr/bin/nvidia-smi.",
+      "subject": "host",
+      "evidence": [
+        {
+          "source": "nvidia-smi",
+          "key": "path",
+          "value": "/usr/bin/nvidia-smi"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-SYS-002",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "NVIDIA driver 595.99.02 answers",
+      "reason": "The driver supports CUDA up to 13.2. That is the newest CUDA it can run, not a CUDA toolkit installed on this machine.",
+      "subject": "host",
+      "evidence": [
+        {
+          "source": "nvidia-smi",
+          "key": "driver_version",
+          "value": "595.99.02"
+        },
+        {
+          "source": "nvidia-smi",
+          "key": "max_cuda_version",
+          "value": "13.2"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-SYS-003",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "1 GPU visible to the driver",
+      "reason": "NVIDIA GeForce RTX 3050 Laptop GPU (compute 8.6)",
+      "subject": "host",
+      "evidence": [
+        {
+          "source": "nvidia-smi",
+          "key": "gpu0",
+          "value": "NVIDIA GeForce RTX 3050 Laptop GPU"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-ENV-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "Python 3.13.13 (cpython, conda env)",
+      "reason": "Inspected ~/envs/sapiens2/bin/python.",
+      "subject": "A",
+      "evidence": [
+        {
+          "source": "python-probe",
+          "key": "executable",
+          "value": "~/envs/sapiens2/bin/python"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-ENV-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "Python 3.12.13 (cpython, venv)",
+      "reason": "Inspected ~/envs/cpu-venv/bin/python.",
+      "subject": "B",
+      "evidence": [
+        {
+          "source": "python-probe",
+          "key": "executable",
+          "value": "~/envs/cpu-venv/bin/python"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-TORCH-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "torch 2.11.0+cu128 is installed",
+      "reason": "Found in ~/envs/sapiens2/lib/python3.13/site-packages.",
+      "subject": "A",
+      "evidence": [
+        {
+          "source": "python-metadata",
+          "key": "torch",
+          "value": "2.11.0+cu128"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-TORCH-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "torch 2.15.0+cpu is installed",
+      "reason": "Found in ~/envs/cpu-venv/lib/python3.12/site-packages.",
+      "subject": "B",
+      "evidence": [
+        {
+          "source": "python-metadata",
+          "key": "torch",
+          "value": "2.15.0+cpu"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-TORCH-002",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "torch 2.11.0+cu128 is a CUDA 12.8 build",
+      "reason": "The metadata of this torch shows a CUDA build. Nothing was imported.",
+      "subject": "A",
+      "evidence": [
+        {
+          "source": "torch-metadata",
+          "key": "version",
+          "value": "2.11.0+cu128"
+        },
+        {
+          "source": "torch/version.py",
+          "key": "cuda",
+          "value": "12.8"
+        },
+        {
+          "source": "torch/version.py",
+          "key": "hip",
+          "value": "None"
+        },
+        {
+          "source": "torch/lib",
+          "key": "cuda_library",
+          "value": "present"
+        },
+        {
+          "source": "torch/lib",
+          "key": "hip_library",
+          "value": "absent"
+        },
+        {
+          "source": "torch-metadata",
+          "key": "requires_nvidia",
+          "value": "nvidia-cudnn-cu12, nvidia-cusparselt-cu12, nvidia-nccl-cu12, nvidia-nvshmem-cu12"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-TORCH-002",
+      "status": "fail",
+      "severity": "high",
+      "confidence": "high",
+      "summary": "torch 2.15.0+cpu is a CPU-only build",
+      "reason": "This build has no CUDA support, so torch.cuda.is_available() is False here whatever the driver can do.",
+      "subject": "B",
+      "evidence": [
+        {
+          "source": "torch-metadata",
+          "key": "version",
+          "value": "2.15.0+cpu"
+        },
+        {
+          "source": "torch/version.py",
+          "key": "cuda",
+          "value": "None"
+        },
+        {
+          "source": "torch/version.py",
+          "key": "hip",
+          "value": "None"
+        },
+        {
+          "source": "torch/lib",
+          "key": "cuda_library",
+          "value": "absent"
+        },
+        {
+          "source": "torch/lib",
+          "key": "hip_library",
+          "value": "absent"
+        }
+      ],
+      "recommended_action": "Install a CUDA build with the selector at https://pytorch.org/get-started/locally/, choosing a CUDA version up to 13.2 (what this driver supports).",
+      "verify_command": "gpu-stack-inspector inspect --python ~/envs/cpu-venv/bin/python",
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-TORCH-004",
+      "status": "not_tested",
+      "severity": "low",
+      "confidence": "high",
+      "summary": "CUDA was not exercised; only metadata was read",
+      "reason": "A CUDA build can still fail at runtime: missing libraries, a driver that refuses, or no code for this GPU.",
+      "subject": "A",
+      "evidence": [],
+      "recommended_action": "Run `gpu-stack-inspector probe --runtime --python ~/envs/sapiens2/bin/python` to import torch and run a tiny CUDA operation (it uses a little GPU memory).",
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-CUDA-001",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "nvcc 12.4.131 is installed",
+      "reason": "Found at /usr/bin/nvcc.",
+      "subject": "host",
+      "evidence": [
+        {
+          "source": "nvcc",
+          "key": "version",
+          "value": "12.4.131"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-CUDA-002",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "The driver supports nvcc's CUDA 12.4",
+      "reason": "The driver supports CUDA up to 13.2.",
+      "subject": "host",
+      "evidence": [
+        {
+          "source": "nvcc",
+          "key": "version",
+          "value": "12.4.131"
+        },
+        {
+          "source": "nvidia-smi",
+          "key": "max_cuda_version",
+          "value": "13.2"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-CUDA-003",
+      "status": "pass",
+      "severity": "info",
+      "confidence": "high",
+      "summary": "The driver supports CUDA 12.8",
+      "reason": "torch targets CUDA 12.8; the driver supports up to 13.2.",
+      "subject": "A",
+      "evidence": [
+        {
+          "source": "torch",
+          "key": "cuda_version",
+          "value": "12.8"
+        },
+        {
+          "source": "nvidia-smi",
+          "key": "max_cuda_version",
+          "value": "13.2"
+        }
+      ],
+      "recommended_action": null,
+      "verify_command": null,
+      "limitations": [],
+      "caused_by": null
+    },
+    {
+      "id": "GSI-DIFF-001",
+      "status": "warn",
+      "severity": "medium",
+      "confidence": "high",
+      "summary": "The environments have different PyTorch builds: A CUDA 12.8, B CPU only",
+      "reason": "This is the most likely reason CUDA works in one environment and not in another.",
+      "subject": "comparison",
+      "evidence": [
+        {
+          "source": "comparison",
+          "key": "A",
+          "value": "CUDA 12.8"
+        },
+        {
+          "source": "comparison",
+          "key": "B",
+          "value": "CPU only"
+        }
+      ],
+      "recommended_action": "Install the same CUDA build of torch in the environment that should use the GPU; GSI-TORCH-002 says which build each one has.",
+      "verify_command": "gpu-stack-inspector compare --python … --python …",
+      "limitations": [],
+      "caused_by": null
+    }
+  ],
+  "redactions": [
+    {
+      "kind": "home_path",
+      "count": 31
+    }
+  ]
+}
