@@ -18,6 +18,8 @@ DEFAULT_ROOTS: tuple[Path, ...] = () if os.name == "nt" else (Path("/usr/local")
 
 _MAX_FILE_BYTES = 64 * 1024
 _TOOLKIT_DIR = re.compile(r"cuda(?:-[0-9]+(?:\.[0-9]+)*)?")
+_VERSION_TXT = re.compile(r"CUDA Version\s+(?P<version>[0-9]+(?:\.[0-9]+)+)")
+_CUDA_H = re.compile(r"^\s*#\s*define\s+CUDA_VERSION\s+(?P<number>[0-9]{4,6})\b", re.MULTILINE)
 _ENV = {"LC_ALL": "C"}
 _NVCC_RELEASE = re.compile(
     r"release\s+(?P<release>[0-9]+(?:\.[0-9]+)*),\s*V(?P<full>[0-9]+(?:\.[0-9]+)*)"
@@ -71,6 +73,16 @@ def read_toolkit_version(directory: Path) -> tuple[str | None, str | None]:
             version = None
         if isinstance(version, str) and version:
             return version, "version.json"
+    text = _read_small(directory / "version.txt")  # CUDA 10.x and older
+    match = _VERSION_TXT.search(text) if text is not None else None
+    if match:
+        return match["version"], "version.txt"
+    text = _read_small(directory / "include" / "cuda.h")
+    match = _CUDA_H.search(text) if text is not None else None
+    if match:
+        # CUDA_VERSION is 1000 * major + 10 * minor: 12040 is 12.4.
+        number = int(match["number"])
+        return f"{number // 1000}.{number % 1000 // 10}", "include/cuda.h"
     return None, None
 
 

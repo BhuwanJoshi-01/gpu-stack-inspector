@@ -102,3 +102,26 @@ def test_huge_version_files_are_read_only_partially(tmp_path: Path) -> None:
         '{"cuda": {"version": "12.4.1"}, "pad": "' + "x" * 200_000 + '"}'
     )
     assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory))]
+
+
+def test_old_toolkits_are_versioned_by_version_txt(tmp_path: Path) -> None:
+    directory = make_toolkit(tmp_path, "cuda-10.2")
+    (directory / "version.txt").write_text("CUDA Version 10.2.89\n")
+    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory), "10.2.89", "version.txt")]
+
+
+@pytest.mark.parametrize(
+    ("define", "version"),
+    [("#define CUDA_VERSION 12040", "12.4"), ("#  define CUDA_VERSION 11080 /* 11.8 */", "11.8")],
+)
+def test_cuda_header_is_the_last_resort(tmp_path: Path, define: str, version: str) -> None:
+    directory = make_toolkit(tmp_path, "cuda")
+    (directory / "include").mkdir()
+    (directory / "include" / "cuda.h").write_text(f"/* header */\n{define}\n")
+    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory), version, "include/cuda.h")]
+
+
+def test_version_json_wins_over_the_other_sources(tmp_path: Path) -> None:
+    directory = make_toolkit(tmp_path, "cuda-12.4", {"cuda": {"version": "12.4.1"}})
+    (directory / "version.txt").write_text("CUDA Version 9.0.0\n")
+    assert find_toolkits([tmp_path])[0].version == "12.4.1"
