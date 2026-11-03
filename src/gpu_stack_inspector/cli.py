@@ -175,6 +175,55 @@ def compare(
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
 
 
+@app.command()
+def probe(
+    runtime: Annotated[
+        bool,
+        typer.Option(
+            "--runtime",
+            help="Agree to import torch in each interpreter and run a tiny CUDA operation.",
+        ),
+    ] = False,
+    python: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help="Interpreter to test. Repeat it to test several. Default: the python on PATH.",
+        ),
+    ] = None,
+    output_format: Annotated[
+        OutputFormat, typer.Option("--format", "-f", help="Output format.")
+    ] = OutputFormat.TEXT,
+) -> None:
+    """Prove CUDA works: import torch and run a tiny CUDA operation (needs --runtime).
+
+    This is the only command that imports packages of the inspected environments. It
+    creates a CUDA context and uses a few kilobytes of GPU memory for a moment, so it only
+    runs when you pass --runtime.
+    """
+    if not runtime:
+        typer.echo(
+            "probe imports torch in each interpreter and runs a tiny CUDA operation, which "
+            "uses a little GPU memory. Run it again with --runtime to agree.",
+            err=True,
+        )
+        raise typer.Exit(ExitCode.ERROR)
+    count = len(python) if python else 1
+    typer.echo(
+        f"Importing torch and running a tiny CUDA operation in {count} interpreter(s)…", err=True
+    )
+    snapshot = _collect(python, compare=count >= 2, runtime=True)
+    redacted = redact_snapshot(snapshot)
+    if output_format is OutputFormat.JSON:
+        typer.echo(render_json(redacted), nl=False)
+    else:
+        render_terminal(redacted, Console())
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
 class ReportFormat(StrEnum):
     MARKDOWN = "markdown"
     JSON = "json"
@@ -233,18 +282,18 @@ def report(
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
 
 
-def _collect(python: list[str] | None, *, compare: bool) -> Snapshot:
+def _collect(python: list[str] | None, *, compare: bool, runtime: bool = False) -> Snapshot:
     """Inspect, run every check and, if asked, compare: the shared part of each command.
 
     Without interpreters the python on PATH is used; the shell's python also goes into the
-    rule context.
+    rule context. ``runtime`` is the user's consent to import torch and use CUDA.
     """
     shell_python = next(iter(orchestrator.default_interpreters()), None)
     pythons = python or ([shell_python] if shell_python else [])
     if not pythons:
         typer.echo("No python found on PATH; name interpreters with --python.", err=True)
     snapshot = orchestrator.diagnose(
-        orchestrator.inspect(SubprocessRunner(), pythons),
+        orchestrator.inspect(SubprocessRunner(), pythons, runtime=runtime),
         RuleContext(shell_python=shell_python),
     )
     return orchestrator.with_comparison(snapshot) if compare else snapshot
