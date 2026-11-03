@@ -83,3 +83,27 @@ class Finding:
             raise ValueError(f"finding id {self.id!r} does not match GSI-<AREA>-<NNN>")
         if not self.summary.strip():
             raise ValueError(f"finding {self.id} has an empty summary")
+
+
+class FailureKind(StrEnum):
+    """Why a probe produced no usable facts."""
+
+    NOT_FOUND = "not_found"
+    PERMISSION_DENIED = "permission_denied"
+    TIMEOUT = "timeout"
+    NONZERO_EXIT = "nonzero_exit"
+    MALFORMED_OUTPUT = "malformed_output"
+    OS_ERROR = "os_error"
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeFailure:
+    """A probe that could not deliver its facts.
+
+    Collectors return these instead of raising, so one broken tool never hides the
+    results of the others, and rules can report ``unknown`` with the reason.
+    """
+
+    probe: str
+    kind: FailureKind
+    detail: str

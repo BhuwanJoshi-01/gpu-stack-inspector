@@ -2,7 +2,15 @@ import dataclasses
 
 import pytest
 
-from gpu_stack_inspector.models import Confidence, Evidence, Finding, Severity, Status
+from gpu_stack_inspector.models import (
+    Confidence,
+    Evidence,
+    FailureKind,
+    Finding,
+    ProbeFailure,
+    Severity,
+    Status,
+)
 
 
 def test_status_values_are_the_documented_json_strings() -> None:
@@ -61,3 +69,23 @@ def test_findings_and_evidence_are_immutable() -> None:
         finding.status = Status.PASS  # type: ignore[misc]
     with pytest.raises(dataclasses.FrozenInstanceError):
         finding.evidence[0].value = "1"  # type: ignore[misc]
+
+
+def test_failure_kinds_are_the_documented_json_strings() -> None:
+    assert [k.value for k in FailureKind] == [
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "nonzero_exit",
+        "malformed_output",
+        "os_error",
+    ]
+
+
+def test_probe_failure_keeps_probe_kind_and_detail() -> None:
+    failure = ProbeFailure("nvidia-smi", FailureKind.TIMEOUT, "no answer within 8 s")
+    assert (failure.probe, failure.kind, failure.detail) == (
+        "nvidia-smi",
+        FailureKind.TIMEOUT,
+        "no answer within 8 s",
+    )
