@@ -31,6 +31,11 @@ explicitly given Python interpreters.
   with dated, source-tagged NVIDIA compatibility data). Problems say what to do
   next and how to check it; a consequence of another finding says which one it
   follows from. Findings are in the JSON output too.
+- `compare --python A --python B […]` puts environments side by side: a table of
+  the fields that differ (Python, conda/venv, user site, PYTHONPATH, torch
+  version, build and location, every GPU-relevant package; `--all` for every
+  field), then the findings, including GSI-DIFF-001 when the environments have
+  different PyTorch builds. JSON output has the rows with a `differs` flag.
 - `rules list` and `rules explain CODE` document every check.
 - `gpu-stack-inspector --help` and `--version`. Exit codes: 0 when the
   inspection ran (whatever it found), 1 for `--strict` failures, 2 for usage
