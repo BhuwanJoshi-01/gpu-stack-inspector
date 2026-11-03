@@ -69,6 +69,9 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
+markers = [
+    "integration: talks to the real machine; runs only with GSI_INTEGRATION=1",
+]
 
 [tool.coverage.run]
 source = ["gpu_stack_inspector"]
