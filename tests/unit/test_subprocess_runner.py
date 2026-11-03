@@ -12,7 +12,6 @@ import pytest
 from gpu_stack_inspector.runner import CommandResult, Outcome
 
 PY = sys.executable
-pending = pytest.mark.xfail(strict=True, reason="GPU-002: SubprocessRunner pending")
 posix_only = pytest.mark.skipif(os.name != "posix", reason="POSIX permissions and process groups")
 
 
@@ -95,7 +94,6 @@ def test_non_string_arguments_are_rejected() -> None:
         run([PY, "-c", 42])  # type: ignore[list-item]
 
 
-@pending
 def test_output_beyond_the_cap_is_truncated_on_both_streams() -> None:
     code = "import sys; sys.stdout.write('o' * 50000); sys.stderr.write('e' * 50000)"
     result = run([PY, "-c", code], max_output=1000)
@@ -153,3 +151,26 @@ def test_a_single_command_string_is_rejected() -> None:
 def test_timeout_must_be_positive() -> None:
     with pytest.raises(ValueError, match="timeout"):
         run([PY, "-c", "pass"], timeout=0)
+
+
+def test_a_flood_of_output_neither_deadlocks_nor_grows_memory() -> None:
+    code = "import sys\nfor _ in range(200): sys.stdout.write('x' * 65536)\n"
+    result = run([PY, "-c", code], max_output=4096, timeout=20)
+    assert result.outcome is Outcome.OK
+    assert len(result.stdout) == 4096
+    assert result.stdout_truncated
+
+
+@posix_only
+def test_a_finished_command_whose_child_keeps_the_pipe_open_does_not_hang() -> None:
+    code = (
+        "import os, subprocess, sys\n"
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'],"
+        " start_new_session=True)\n"
+        "print('parent done')\n"
+    )
+    started = time.monotonic()
+    result = run([PY, "-c", code], timeout=10)
+    assert result.outcome is Outcome.OK
+    assert result.stdout.strip() == "parent done"
+    assert time.monotonic() - started < 8

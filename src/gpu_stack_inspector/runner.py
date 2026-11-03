@@ -12,18 +12,21 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import IO, Protocol
 
 DEFAULT_MAX_OUTPUT = 256 * 1024
 """Bytes kept per stream; diagnostic output larger than this is truncated."""
 
 _REAP_TIMEOUT = 2.0
-"""Seconds to wait for a killed command's pipes to close before giving up on them."""
+"""Seconds to wait for a finished command's pipes to close before giving up on them."""
+
+_CHUNK = 64 * 1024
 
 
 class Outcome(StrEnum):
@@ -115,29 +118,77 @@ class SubprocessRunner:
         except OSError as exc:
             return _not_started(args, Outcome.OS_ERROR, exc, started)
 
+        if proc.stdout is None or proc.stderr is None:  # cannot happen with PIPE
+            raise RuntimeError("subprocess pipes were not created")
+        readers = (
+            _CappedReader(proc.stdout, self.max_output),
+            _CappedReader(proc.stderr, self.max_output),
+        )
+        for reader in readers:
+            reader.start()
         timed_out = False
         try:
             try:
-                out, err = proc.communicate(timeout=timeout)
+                proc.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 _kill(proc)
-                out, err = _collect_after_kill(proc)
+                proc.wait()
+            # A child that escaped the process group may hold a pipe open; don't wait
+            # for it forever, keep what was read so far.
+            deadline = time.monotonic() + _REAP_TIMEOUT
+            for reader in readers:
+                reader.join(max(0.0, deadline - time.monotonic()))
         except BaseException:
             # Ctrl+C or an internal error: never leave the command running behind us.
             _kill(proc)
             raise
 
+        out, err = readers
         return CommandResult(
             argv=args,
             outcome=Outcome.TIMEOUT
             if timed_out
             else (Outcome.OK if proc.returncode == 0 else Outcome.NONZERO),
             returncode=None if timed_out else proc.returncode,
-            stdout=_decode(out),
-            stderr=_decode(err),
+            stdout=_decode(out.data),
+            stderr=_decode(err.data),
+            stdout_truncated=out.truncated,
+            stderr_truncated=err.truncated,
             duration=time.monotonic() - started,
         )
+
+
+class _CappedReader(threading.Thread):
+    """Drains one pipe, keeping at most ``limit`` bytes.
+
+    It keeps reading (and discarding) past the limit so the command never blocks on a
+    full pipe.
+    """
+
+    def __init__(self, stream: IO[bytes], limit: int) -> None:
+        super().__init__(daemon=True)
+        self._stream = stream
+        self._limit = limit
+        self._kept = bytearray()
+        self.truncated = False
+
+    def run(self) -> None:
+        # os.read returns as soon as any bytes are available; a buffered read() would
+        # wait for a full chunk and lose the output of a command whose child keeps the
+        # pipe open.
+        fd = self._stream.fileno()
+        with contextlib.suppress(OSError, ValueError), self._stream:
+            while chunk := os.read(fd, _CHUNK):
+                room = self._limit - len(self._kept)
+                if room > 0:
+                    self._kept += chunk[:room]
+                if len(chunk) > room:
+                    self.truncated = True
+
+    @property
+    def data(self) -> bytes:
+        return bytes(self._kept)
 
 
 def _checked_argv(argv: Sequence[str]) -> tuple[str, ...]:
@@ -169,24 +220,6 @@ def _kill(proc: subprocess.Popen[bytes]) -> None:
         return
     with contextlib.suppress(ProcessLookupError, PermissionError):  # already gone
         os.killpg(proc.pid, signal.SIGKILL)
-
-
-def _collect_after_kill(proc: subprocess.Popen[bytes]) -> tuple[bytes, bytes]:
-    try:
-        return proc.communicate(timeout=_REAP_TIMEOUT)
-    except subprocess.TimeoutExpired as exc:
-        # A child escaped the process group and still holds the pipes; keep what we have.
-        for stream in (proc.stdout, proc.stderr):
-            if stream is not None:
-                stream.close()
-        proc.wait()
-        return _as_bytes(exc.stdout), _as_bytes(exc.stderr)
-
-
-def _as_bytes(value: bytes | str | None) -> bytes:
-    if value is None:
-        return b""
-    return value.encode() if isinstance(value, str) else value
 
 
 def _decode(data: bytes) -> str:
