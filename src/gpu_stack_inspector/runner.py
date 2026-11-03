@@ -20,6 +20,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import IO, Protocol
 
+from gpu_stack_inspector.models import FailureKind, ProbeFailure
+
 DEFAULT_MAX_OUTPUT = 256 * 1024
 """Bytes kept per stream; diagnostic output larger than this is truncated."""
 
@@ -27,6 +29,7 @@ _REAP_TIMEOUT = 2.0
 """Seconds to wait for a finished command's pipes to close before giving up on them."""
 
 _CHUNK = 64 * 1024
+_DETAIL_LIMIT = 200
 
 
 class Outcome(StrEnum):
@@ -74,6 +77,42 @@ class CommandRunner(Protocol):
         env_overrides: Mapping[str, str] | None = None,
         cwd: Path | None = None,
     ) -> CommandResult: ...
+
+
+_FAILURE_KINDS = {
+    Outcome.NOT_FOUND: FailureKind.NOT_FOUND,
+    Outcome.PERMISSION: FailureKind.PERMISSION_DENIED,
+    Outcome.TIMEOUT: FailureKind.TIMEOUT,
+    Outcome.NONZERO: FailureKind.NONZERO_EXIT,
+    Outcome.OS_ERROR: FailureKind.OS_ERROR,
+}
+
+
+def probe_failure(probe: str, result: CommandResult) -> ProbeFailure | None:
+    """Describe why ``result`` gave no usable output, or ``None`` if it succeeded.
+
+    The detail is short and meant for humans; it is redacted with the rest of the
+    snapshot before any output is written.
+    """
+    if result.ok:
+        return None
+    program = result.argv[0]
+    if result.outcome is Outcome.NOT_FOUND:
+        detail = f"{program} was not found"
+    elif result.outcome is Outcome.PERMISSION:
+        detail = f"permission denied when starting {program}"
+    elif result.outcome is Outcome.TIMEOUT:
+        detail = f"{program} did not finish within {result.duration:.1f} s and was stopped"
+    elif result.outcome is Outcome.NONZERO:
+        detail = f"{program} exited with code {result.returncode}"
+        first_line = next((line.strip() for line in result.stderr.splitlines() if line.strip()), "")
+        if first_line:
+            detail += f": {first_line}"
+    else:
+        detail = f"{program} could not be started: {result.error}"
+    if len(detail) > _DETAIL_LIMIT:
+        detail = detail[: _DETAIL_LIMIT - 1] + "…"
+    return ProbeFailure(probe=probe, kind=_FAILURE_KINDS[result.outcome], detail=detail)
 
 
 class SubprocessRunner:
