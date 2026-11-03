@@ -105,7 +105,8 @@ def probe_failure(probe: str, result: CommandResult) -> ProbeFailure | None:
         detail = f"{program} did not finish within {result.duration:.1f} s and was stopped"
     elif result.outcome is Outcome.NONZERO:
         detail = f"{program} exited with code {result.returncode}"
-        first_line = next((line.strip() for line in result.stderr.splitlines() if line.strip()), "")
+        # Some tools (nvidia-smi among them) print their errors on stdout.
+        first_line = _first_line(result.stderr) or _first_line(result.stdout)
         if first_line:
             detail += f": {first_line}"
     else:
@@ -113,6 +114,10 @@ def probe_failure(probe: str, result: CommandResult) -> ProbeFailure | None:
     if len(detail) > _DETAIL_LIMIT:
         detail = detail[: _DETAIL_LIMIT - 1] + "…"
     return ProbeFailure(probe=probe, kind=_FAILURE_KINDS[result.outcome], detail=detail)
+
+
+def _first_line(text: str) -> str:
+    return next((line.strip() for line in text.splitlines() if line.strip()), "")
 
 
 class SubprocessRunner:
