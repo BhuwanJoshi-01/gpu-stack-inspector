@@ -98,6 +98,8 @@ class FailureKind(StrEnum):
     NONZERO_EXIT = "nonzero_exit"
     MALFORMED_OUTPUT = "malformed_output"
     OS_ERROR = "os_error"
+    PROBE_ERROR = "probe_error"
+    """The probe ran, but reported that part of its own work failed."""
 
 
 @dataclass(frozen=True, slots=True)
