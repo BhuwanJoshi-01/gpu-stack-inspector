@@ -164,14 +164,20 @@ def _render_findings(snapshot: Snapshot, console: Console) -> None:
     root cause are dimmed and say which finding they follow from.
     """
     paths = {interpreter.label: interpreter.path for interpreter in snapshot.interpreters}
-    subjects = ["host", *paths]
+    subjects = ["host", *paths, "comparison"]
     console.print()
     console.print(Text("Findings", style="bold"))
     for subject in subjects:
         group = [f for f in snapshot.findings if f.subject == subject]
         if not group:
             continue
-        heading = "Host" if subject == "host" else f"{subject}  {paths[subject]}"
+        heading = (
+            "Host"
+            if subject == "host"
+            else "Comparison"
+            if subject == "comparison"
+            else f"{subject}  {paths[subject]}"
+        )
         console.print(Text(heading, style="bold"))
         table = Table.grid(padding=(0, 1))
         table.add_column(width=10, no_wrap=True)

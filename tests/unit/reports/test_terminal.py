@@ -197,3 +197,18 @@ def test_long_commands_are_folded_not_cut_off() -> None:
     text = console.export_text()
     assert "…" not in text
     assert "".join(text.split()).count("directory-name/") == 12
+
+
+def test_findings_about_the_comparison_come_last() -> None:
+    snapshot = Snapshot(
+        "0.1.0",
+        "t",
+        interpreters=(InterpreterFacts("A", "/a"), InterpreterFacts("B", "/b")),
+        findings=(
+            _finding("GSI-DIFF-001", Status.WARN, "different builds", "comparison"),
+            _finding("GSI-ENV-001", Status.PASS, "Python 3.12", "A"),
+        ),
+    )
+    lines = [" ".join(line.split()) for line in render(snapshot).splitlines()]
+    assert lines.index("Comparison") > lines.index("A /a")
+    assert any(line.startswith("WARN GSI-DIFF-001 different builds") for line in lines)
