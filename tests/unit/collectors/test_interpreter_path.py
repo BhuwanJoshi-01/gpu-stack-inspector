@@ -92,3 +92,17 @@ def test_an_empty_path_is_rejected(tmp_path: Path) -> None:
     path, failure = check("  ", tmp_path)
     assert path is None
     assert failure.kind is FailureKind.NOT_FOUND
+
+
+def test_an_environment_directory_suggests_its_interpreter(tmp_path: Path) -> None:
+    program = fake_python(tmp_path / "envs" / "a" / "bin")
+    path, failure = check(str(tmp_path / "envs" / "a"), tmp_path)
+    assert path is None
+    assert failure.kind is FailureKind.NOT_FOUND
+    assert failure.detail.endswith(f"did you mean {program}?")
+
+
+def test_a_plain_directory_gets_no_suggestion(tmp_path: Path) -> None:
+    path, failure = check(str(tmp_path), tmp_path)
+    assert path is None
+    assert failure.detail == f"{tmp_path} is a directory, not an interpreter"

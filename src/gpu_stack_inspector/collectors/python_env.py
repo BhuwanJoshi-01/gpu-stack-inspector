@@ -12,6 +12,12 @@ from pathlib import Path
 from gpu_stack_inspector.models import FailureKind, ProbeFailure
 
 PROBE = "python"
+_INTERPRETERS_IN_AN_ENVIRONMENT = (
+    Path("bin", "python"),
+    Path("bin", "python3"),
+    Path("Scripts", "python.exe"),
+    Path("python.exe"),  # conda on Windows
+)
 
 
 def interpreter_path(
@@ -38,7 +44,13 @@ def interpreter_path(
             detail = f"{path} does not exist"
         return None, _failure(FailureKind.NOT_FOUND, detail)
     if path.is_dir():
-        return None, _failure(FailureKind.NOT_FOUND, f"{path} is a directory, not an interpreter")
+        detail = f"{path} is a directory, not an interpreter"
+        inside = next(
+            (path / c for c in _INTERPRETERS_IN_AN_ENVIRONMENT if (path / c).is_file()), None
+        )
+        if inside is not None:
+            detail += f"; did you mean {inside}?"
+        return None, _failure(FailureKind.NOT_FOUND, detail)
     if not os.access(path, os.X_OK):
         return None, _failure(FailureKind.PERMISSION_DENIED, f"{path} is not executable")
     return path, None
