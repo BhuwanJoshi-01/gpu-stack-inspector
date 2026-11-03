@@ -13,6 +13,8 @@ and not another. Plain Python 3.11+, Typer and Rich, packaged with uv (`uv_build
 uv sync                                    # create .venv with the dev tools
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest -q   # what CI runs
 uv run pytest -q --cov                     # with coverage
+GSI_INTEGRATION=1 uv run pytest -q tests/integration   # against this machine's GPU/driver
+HYPOTHESIS_PROFILE=thorough uv run pytest -q           # property tests with 2000 examples
 ```
 
 ## Layout
@@ -25,10 +27,16 @@ src/gpu_stack_inspector/
                   capped output), probe_failure()
   privacy.py      strip_control(), RedactionContext, Redactor (text + whole snapshots, summary)
   exit_codes.py   ExitCode: 0 ok, 1 strict, 2 error, 3 context unavailable, 130 interrupted
+  orchestrator.py inspect_host(): runs the collectors, assembles the Snapshot (no diagnosis)
+  collectors/     host.py (OS, distro, WSL flag), nvidia.py (nvidia-smi query, --version, table
+                  header fallback), toolkit.py (nvcc, /usr/local/cuda*, /opt/cuda*, CUDA_HOME…),
+                  environment.py (allowlisted CUDA variables only)
 tests/
   conftest.py     autouse no_network guard; HYPOTHESIS_PROFILE=thorough
   fakes.py        FakeRunner: scripted commands only, anything else fails the test
+  fixtures/       real and synthetic captures, each set with a README saying which is which
   unit/           unit tests (no GPU needed)
+  integration/    real-machine tests, only with GSI_INTEGRATION=1
 docs/roadmap.md   requirement IDs GPU-001 … and what v0.1 includes
 .github/          CI, issue forms, PR template
 ```
