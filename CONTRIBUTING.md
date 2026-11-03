@@ -17,6 +17,7 @@ You need [uv](https://docs.astral.sh/uv/). No GPU is needed for development; the
 git clone https://github.com/BhuwanJoshi-01/gpu-stack-inspector.git
 cd gpu-stack-inspector
 uv sync
+uv run gpu-stack-inspector --help
 ```
 
 Before every commit, run the same checks as CI:
