@@ -1,6 +1,7 @@
 # Metadata probe fixtures
 
-Real output of the metadata probe (`probes/metadata_program.py`), captured on one laptop
+Real output of the metadata probe (`probes/metadata_program.py`, including its `torch`
+section), captured on one laptop
 (RTX 3050, Ubuntu 26.04, Miniconda) and redacted with the tool's own redactor before
 saving: home directories are `~`, no user or host names remain.
 
