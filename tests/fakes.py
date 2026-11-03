@@ -53,3 +53,11 @@ class FakeRunner:
         if key not in self.responses:
             raise UnexpectedCommandError(f"unscripted command: {list(key)}")
         return self.responses[key]
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def read_fixture(*parts: str) -> str:
+    """Text of a file under tests/fixtures/ (see the README next to each set)."""
+    return FIXTURES.joinpath(*parts).read_text(encoding="utf-8")
