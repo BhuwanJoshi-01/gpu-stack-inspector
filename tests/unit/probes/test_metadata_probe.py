@@ -69,7 +69,6 @@ def run(tmp_path: Path, **answer: Any) -> tuple[Any, FakeRunner]:
     return module().probe_interpreter(runner, "A", str(python), cwd=tmp_path), runner
 
 
-@pending
 def test_a_healthy_interpreter_is_described(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, stdout=wrapped(GOOD))
     assert facts.label == "A"
@@ -88,7 +87,6 @@ def test_a_healthy_interpreter_is_described(tmp_path: Path) -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_the_probe_runs_in_an_empty_temporary_directory_with_a_timeout(tmp_path: Path) -> None:
     _, runner = run(tmp_path, stdout=wrapped(GOOD))
     call = runner.calls[0]
@@ -100,14 +98,12 @@ def test_the_probe_runs_in_an_empty_temporary_directory_with_a_timeout(tmp_path:
     assert call.timeout == 8.0
 
 
-@pending
 def test_an_unusable_path_runs_nothing(tmp_path: Path) -> None:
     facts = module().probe_interpreter(FakeRunner(), "B", str(tmp_path / "missing"), cwd=tmp_path)
     assert facts.version is None
     assert [f.kind for f in facts.failures] == [FailureKind.NOT_FOUND]
 
 
-@pending
 def test_output_around_the_markers_is_ignored(tmp_path: Path) -> None:
     noise = "sitecustomize: welcome!\nGSI-PROBE-END stray marker\n"
     facts, _ = run(tmp_path, stdout=wrapped(GOOD, noise=noise) + "atexit says bye\n")
@@ -115,14 +111,12 @@ def test_output_around_the_markers_is_ignored(tmp_path: Path) -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_no_probe_result_is_malformed_output(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, stdout="hello from a strange interpreter\n")
     assert [f.kind for f in facts.failures] == [FailureKind.MALFORMED_OUTPUT]
     assert "no probe result" in facts.failures[0].detail
 
 
-@pending
 def test_a_result_cut_off_by_the_output_limit_says_so(tmp_path: Path) -> None:
     result = {
         "outcome": Outcome.OK,
@@ -135,20 +129,17 @@ def test_a_result_cut_off_by_the_output_limit_says_so(tmp_path: Path) -> None:
     assert "output limit" in facts.failures[0].detail
 
 
-@pending
 def test_invalid_json_is_malformed_output(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, stdout="GSI-PROBE-BEGIN{not json GSI-PROBE-END")
     assert [f.kind for f in facts.failures] == [FailureKind.MALFORMED_OUTPUT]
 
 
-@pending
 def test_an_unknown_protocol_is_malformed_output(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, stdout=wrapped({**GOOD, "protocol": 2}))
     assert facts.version is None
     assert "protocol 2" in facts.failures[0].detail
 
 
-@pending
 def test_fields_of_the_wrong_type_become_unknown(tmp_path: Path) -> None:
     document = json.loads(json.dumps(GOOD))
     document["python"]["version"] = 3.12
@@ -165,7 +156,6 @@ def test_fields_of_the_wrong_type_become_unknown(tmp_path: Path) -> None:
     assert "version" in facts.failures[0].detail
 
 
-@pending
 def test_errors_reported_by_the_probe_are_kept(tmp_path: Path) -> None:
     document = {
         **GOOD,
@@ -213,7 +203,6 @@ def test_an_interpreter_too_old_for_the_probe_is_named_as_such(tmp_path: Path) -
     assert "needs Python 3.8 or newer" in facts.failures[0].detail
 
 
-@pending
 def test_a_hung_interpreter_is_a_timeout(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, result={"outcome": Outcome.TIMEOUT, "duration": 8.0})
     assert [f.kind for f in facts.failures] == [FailureKind.TIMEOUT]
