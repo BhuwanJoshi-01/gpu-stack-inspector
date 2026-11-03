@@ -81,6 +81,31 @@ def distributions() -> list[dict[str, str]]:
     return sorted(found, key=lambda d: (d["name"], d["location"]))
 
 
+def torch_facts() -> dict[str, object] | None:
+    """Static signals about the torch that ``import torch`` would find, without importing it.
+
+    Returns None when torch is not installed.
+    """
+    try:
+        from importlib import metadata
+    except ImportError:  # Python before 3.8: the distributions section still lists torch
+        return None
+    try:
+        dist = metadata.distribution("torch")
+    except metadata.PackageNotFoundError:
+        return None
+    requirements = []
+    for requirement in dist.requires or []:
+        match = re.match(r"[A-Za-z0-9._-]+", requirement)
+        if match and normalize(match.group(0)).startswith("nvidia-"):
+            requirements.append(normalize(match.group(0)))
+    return {
+        "version": dist.version,
+        "location": str(dist.locate_file("")),
+        "requires_nvidia": sorted(set(requirements)),
+    }
+
+
 def scan_dist_info(paths: list[str]) -> list[dict[str, str]]:
     """Fallback without importlib.metadata: read the headers of ``*.dist-info/METADATA``."""
     found = []
@@ -130,7 +155,9 @@ def collect(sections: list[tuple[str, Callable[[], object]]]) -> dict[str, objec
 
 
 def main() -> None:
-    result = collect([("python", python_facts), ("distributions", distributions)])
+    result = collect(
+        [("python", python_facts), ("distributions", distributions), ("torch", torch_facts)]
+    )
     sys.stdout.write(BEGIN + json.dumps(result, ensure_ascii=True, sort_keys=True) + END + "\n")
     sys.stdout.flush()
 

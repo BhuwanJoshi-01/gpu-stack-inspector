@@ -141,3 +141,37 @@ def test_a_failing_section_is_reported_and_the_others_still_run() -> None:
 
 def test_a_healthy_interpreter_reports_no_errors() -> None:
     assert run_probe()["errors"] == []
+
+
+TORCH_METADATA = """Metadata-Version: 2.1
+Name: torch
+Version: 2.11.0+cu128
+Requires-Dist: filelock
+Requires-Dist: nvidia-cuda-runtime-cu12==12.8.90; platform_system == "Linux"
+Requires-Dist: nvidia_cudnn_cu12==9.10.2.21; platform_system == "Linux"
+Requires-Dist: nvidia-cuda-runtime-cu12==12.8.90; platform_system == "Linux"
+Requires-Dist: numpy; extra == "numpy"
+"""
+
+
+def fake_torch(root: Path, metadata: str = TORCH_METADATA) -> Path:
+    """A torch distribution as pip leaves it, without any real torch code."""
+    site = root / "site-packages"
+    info = site / "torch-2.11.0+cu128.dist-info"
+    info.mkdir(parents=True)
+    info.joinpath("METADATA").write_text(metadata, encoding="utf-8")
+    (site / "torch" / "lib").mkdir(parents=True)
+    return site
+
+
+def test_without_torch_the_torch_section_is_null() -> None:
+    assert run_probe()["torch"] is None
+
+
+def test_torch_version_location_and_nvidia_requirements_are_reported(tmp_path: Path) -> None:
+    site = fake_torch(tmp_path)
+    torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
+    assert isinstance(torch, dict)
+    assert torch["version"] == "2.11.0+cu128"
+    assert Path(torch["location"]) == site
+    assert torch["requires_nvidia"] == ["nvidia-cuda-runtime-cu12", "nvidia-cudnn-cu12"]
