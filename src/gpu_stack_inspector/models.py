@@ -141,6 +141,8 @@ class Snapshot:
     toolkit: ToolkitFacts | None = None
     cuda_environment: tuple[EnvironmentVariable, ...] = ()
     interpreters: tuple[InterpreterFacts, ...] = ()
+    comparison: tuple[FieldComparison, ...] = ()
+    """Field-by-field differences between the interpreters, when they were compared."""
     probe_failures: tuple[ProbeFailure, ...] = ()
     findings: tuple[Finding, ...] = ()
 
@@ -290,3 +292,18 @@ class InterpreterFacts:
         if self.prefix is None or self.base_prefix is None:
             return None
         return self.prefix != self.base_prefix
+
+
+@dataclass(frozen=True, slots=True)
+class FieldComparison:
+    """One field across the compared interpreters, in their order.
+
+    ``None`` means the interpreter has no value for it (not installed, not inspected).
+    """
+
+    field: str
+    values: tuple[str | None, ...]
+
+    @property
+    def differs(self) -> bool:
+        return len(set(self.values)) > 1

@@ -23,6 +23,7 @@ from gpu_stack_inspector.models import (
 )
 from gpu_stack_inspector.probes.metadata_probe import probe_interpreter
 from gpu_stack_inspector.rules.catalog import builtin_rules
+from gpu_stack_inspector.rules.comparison import compare_interpreters
 from gpu_stack_inspector.rules.engine import RuleContext, evaluate
 from gpu_stack_inspector.runner import CommandRunner
 
@@ -107,3 +108,8 @@ def default_interpreters(which: Callable[[str], str | None] = shutil.which) -> l
 def diagnose(snapshot: Snapshot, context: RuleContext | None = None) -> Snapshot:
     """The snapshot with the findings of every built-in rule attached."""
     return replace(snapshot, findings=evaluate(snapshot, builtin_rules(), context))
+
+
+def with_comparison(snapshot: Snapshot) -> Snapshot:
+    """The snapshot with its interpreters compared field by field."""
+    return replace(snapshot, comparison=compare_interpreters(snapshot.interpreters))

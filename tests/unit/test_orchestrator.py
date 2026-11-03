@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from gpu_stack_inspector import __version__
@@ -9,6 +10,7 @@ from gpu_stack_inspector.orchestrator import (
     inspect,
     inspect_host,
     interpreter_label,
+    with_comparison,
 )
 from gpu_stack_inspector.probes.metadata_probe import program_source
 from gpu_stack_inspector.runner import CommandResult, Outcome
@@ -110,3 +112,21 @@ def test_diagnose_attaches_the_findings_of_the_builtin_rules() -> None:
     diagnosed = diagnose(snapshot)
     assert [f.id for f in diagnosed.findings][:3] == ["GSI-SYS-001", "GSI-SYS-002", "GSI-SYS-003"]
     assert diagnosed.nvidia == snapshot.nvidia
+
+
+def test_with_comparison_compares_the_inspected_interpreters() -> None:
+    from gpu_stack_inspector.models import InterpreterFacts
+
+    snapshot = inspect_host(
+        FakeRunner(), which=lambda _: None, environ={}, toolkit_roots=(), host=lambda: HOST
+    )
+    snapshot = replace(
+        snapshot,
+        interpreters=(
+            InterpreterFacts("A", "/a/python", version="3.12.0"),
+            InterpreterFacts("B", "/b/python", version="3.13.0"),
+        ),
+    )
+    compared = with_comparison(snapshot)
+    python_row = next(row for row in compared.comparison if row.field == "Python")
+    assert python_row.values == ("3.12.0", "3.13.0")
