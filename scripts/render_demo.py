@@ -10,6 +10,7 @@ redaction, to text only); nothing else is changed.
 from __future__ import annotations
 
 import argparse
+import io
 from dataclasses import fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -53,7 +54,7 @@ def main() -> None:
         orchestrator.diagnose(orchestrator.inspect(SubprocessRunner(), args.python), RuleContext())
     )
     snapshot = rename(redact_snapshot(snapshot), pairs)
-    console = Console(record=True, width=args.width, force_terminal=True)
+    console = Console(record=True, width=args.width, force_terminal=True, file=io.StringIO())
     render_compare(snapshot, console)
     console.save_svg(str(args.output), title="gpu-stack-inspector compare")
 
