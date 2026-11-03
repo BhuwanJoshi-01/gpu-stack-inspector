@@ -108,3 +108,15 @@ def test_a_failing_import_fails() -> None:
     )
     [result] = results(replace(ENV, runtime=broken), "GSI-TORCH-003")
     assert (result.summary, result.reason) == ("import torch fails", "ImportError: libcudnn.so.9")
+
+
+def test_a_cuda_build_without_a_runtime_check_is_not_tested_never_passed() -> None:
+    [result] = results(ENV, "GSI-TORCH-004")
+    assert result.status is Status.NOT_TESTED
+    assert "probe --runtime --python /envs/a/bin/python" in (result.recommended_action or "")
+    assert results(ENV, "GSI-TORCH-003") == []
+
+
+def test_no_runtime_reminder_once_the_runtime_check_ran_or_for_cpu_builds() -> None:
+    assert results(replace(ENV, runtime=runtime("sapiens2.stdout.txt")), "GSI-TORCH-004") == []
+    assert results(replace(ENV, torch=CPU_TORCH), "GSI-TORCH-004") == []

@@ -389,3 +389,34 @@ def cuda_works(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
                 subject=interpreter.label,
                 verify_command=check,
             )
+
+
+@RULES.rule("GSI-TORCH-004", "CUDA was exercised at runtime")
+def cuda_exercised(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether a CUDA build of torch was actually tried, not only read from metadata.
+
+    Metadata can show a CUDA build, but only importing torch and running an operation
+    proves it works: libraries can be missing, the driver can refuse, the build can lack
+    code for this GPU. Without probe --runtime this is "not tested", never a pass.
+    """
+    for interpreter in snapshot.interpreters:
+        if interpreter.version is None or interpreter.runtime is not None:
+            continue
+        if classify_torch(interpreter.torch).kind is not TorchBuildKind.CUDA:
+            continue
+        yield Finding(
+            id="GSI-TORCH-004",
+            status=Status.NOT_TESTED,
+            severity=Severity.LOW,
+            confidence=Confidence.HIGH,
+            summary="CUDA was not exercised; only metadata was read",
+            reason=(
+                "A CUDA build can still fail at runtime: missing libraries, a driver that "
+                "refuses, or no code for this GPU."
+            ),
+            subject=interpreter.label,
+            recommended_action=(
+                f"Run `gpu-stack-inspector probe --runtime --python {interpreter.path}` to import "
+                "torch and run a tiny CUDA operation (it uses a little GPU memory)."
+            ),
+        )
