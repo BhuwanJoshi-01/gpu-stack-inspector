@@ -122,12 +122,17 @@ def utc_timestamp() -> str:
 class Snapshot:
     """Everything one run observed and concluded; the input of every renderer.
 
-    Host and interpreter facts join this record as their collectors are added.
+    ``probe_failures`` collects the failures of every collector in one place, so a report
+    can list what could not be checked. Interpreter facts join as their collector is added.
     """
 
     tool_version: str
     created_at: str
     schema_version: int = SCHEMA_VERSION
+    host: HostFacts | None = None
+    nvidia: NvidiaFacts | None = None
+    toolkit: ToolkitFacts | None = None
+    cuda_environment: tuple[EnvironmentVariable, ...] = ()
     probe_failures: tuple[ProbeFailure, ...] = ()
     findings: tuple[Finding, ...] = ()
 
