@@ -20,6 +20,7 @@ from gpu_stack_inspector.exit_codes import ExitCode
 from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor, redact_snapshot
 from gpu_stack_inspector.reports.json_report import render_json
+from gpu_stack_inspector.reports.markdown import render_markdown
 from gpu_stack_inspector.reports.terminal import render_compare, render_terminal
 from gpu_stack_inspector.rules.catalog import builtin_rules
 from gpu_stack_inspector.rules.engine import RuleContext
@@ -169,6 +170,43 @@ def compare(
         typer.echo(render_json(redacted), nl=False)
     else:
         render_compare(redacted, Console(), show_all=show_all)
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+class ReportFormat(StrEnum):
+    MARKDOWN = "markdown"
+    JSON = "json"
+
+
+@app.command()
+def report(
+    python: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help=(
+                "Interpreter to include. Repeat it to compare several. Default: the python on PATH."
+            ),
+        ),
+    ] = None,
+    report_format: Annotated[
+        ReportFormat, typer.Option("--format", "-f", help="Report format.")
+    ] = ReportFormat.MARKDOWN,
+) -> None:
+    """Write a redacted report to paste into a bug tracker.
+
+    The report is printed, so it can be read before it is shared. With two or more
+    interpreters it includes their comparison.
+    """
+    snapshot = _collect(python, compare=len(python or []) >= 2)
+    redacted = redact_snapshot(snapshot)
+    rendered = (
+        render_json(redacted) if report_format is ReportFormat.JSON else render_markdown(redacted)
+    )
+    typer.echo(rendered, nl=False)
     if _unusable_interpreters(snapshot):
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
 
