@@ -12,3 +12,4 @@ saving: home directories are `~`, no user or host names remain.
 | `conda-wilor.stdout.txt` | 3.10.22 | torch 2.14.1 from PyPI: a CUDA build **without** a `+cu` tag, 15 nvidia-* wheels |
 | `conda-smplerx.stdout.txt` | 3.8.20 | torch 1.12.0 installed by conda: no `+cu` tag and no nvidia-* wheels |
 | `conda-dwpose.stdout.txt` | 3.10.20 | no torch; onnxruntime-gpu with 7 nvidia-* wheels |
+| `venv-cpu-torch.stdout.txt` | 3.12.13 | a uv venv with torch 2.15.0+cpu from the PyTorch CPU index (the venv's temporary path is shortened to `/tmp/cpu-torch-env`) |
