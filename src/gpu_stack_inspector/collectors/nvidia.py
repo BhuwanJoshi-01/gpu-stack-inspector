@@ -38,7 +38,12 @@ def collect_nvidia(
     if smi is None:
         return NvidiaFacts(smi_path=None)
 
-    result = runner.run(_query_argv(smi, _FIELDS), timeout=timeout, env_overrides=_ENV)
+    fields: Sequence[str] = _FIELDS
+    result = runner.run(_query_argv(smi, fields), timeout=timeout, env_overrides=_ENV)
+    if _rejects_field(result, "compute_cap"):
+        # Drivers older than about R510 do not know compute_cap; ask without it.
+        fields = tuple(field for field in _FIELDS if field != "compute_cap")
+        result = runner.run(_query_argv(smi, fields), timeout=timeout, env_overrides=_ENV)
     if _no_devices(result):
         # The driver answered but sees no GPU: zero devices is the fact to report.
         versions = _versions(runner, smi, timeout)
@@ -51,7 +56,7 @@ def collect_nvidia(
     if failure is not None:
         return NvidiaFacts(smi_path=smi, failures=(failure,))
 
-    gpus, driver_version, failures = _parse_query(result.stdout, _FIELDS)
+    gpus, driver_version, failures = _parse_query(result.stdout, fields)
     versions = _versions(runner, smi, timeout)
     return NvidiaFacts(
         smi_path=smi,
@@ -74,6 +79,11 @@ def _versions(runner: CommandRunner, smi: str, timeout: float) -> dict[str, str]
         match["key"].strip().lower(): match["value"]
         for match in _VERSION_LINE.finditer(result.stdout)
     }
+
+
+def _rejects_field(result: CommandResult, field: str) -> bool:
+    # nvidia-smi prints this on stdout: Field "compute_cap" is not a valid field to query.
+    return result.outcome is Outcome.NONZERO and f'"{field}" is not a valid field' in result.stdout
 
 
 def _no_devices(result: CommandResult) -> bool:

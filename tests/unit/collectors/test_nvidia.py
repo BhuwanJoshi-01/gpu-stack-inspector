@@ -121,7 +121,6 @@ def test_a_hung_nvidia_smi_is_a_timeout_failure() -> None:
     assert [f.kind for f in facts.failures] == [FailureKind.TIMEOUT]
 
 
-@pending
 def test_old_driver_without_compute_cap_is_queried_again_without_it() -> None:
     runner = FakeRunner()
     error = fixture("invalid-field.stdout.txt").replace("bogus_field", "compute_cap")
