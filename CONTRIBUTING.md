@@ -57,3 +57,8 @@ The tool is split into layers that only talk in one direction:
 - One logical change per commit, with an imperative subject (at most 72 characters) and a body that explains why.
 - Mention the requirement ID when there is one, as a `Refs: GPU-003` trailer.
 - The pull request template asks whether you tested on a real machine; say so honestly, "no" is fine.
+
+## Releases
+
+Maintainers release from `main` as described in [docs/PUBLISHING.md](docs/PUBLISHING.md): changelog and version in a
+pull request, then a tag and a GitHub release; the release workflow builds the package and publishes it to PyPI.
