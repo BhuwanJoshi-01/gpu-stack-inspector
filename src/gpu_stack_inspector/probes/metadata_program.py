@@ -36,6 +36,17 @@ EXACT = frozenset(
 PREFIXES = ("nvidia-", "cupy-cuda", "jax-cuda", "tensorrt-")
 MAX_METADATA_BYTES = 64 * 1024
 
+# Libraries in torch/lib that only GPU builds ship (Linux, Windows, macOS names).
+CUDA_LIBRARIES = ("libtorch_cuda.so", "torch_cuda.dll", "libtorch_cuda.dylib")
+HIP_LIBRARIES = ("libtorch_hip.so", "torch_hip.dll")
+
+# torch/version.py lines, old and new style: "cuda = '11.3'", "cuda: Optional[str] = '12.8'",
+# "hip: Optional[str] = None". The file is read as text, never imported.
+VERSION_PY_LINE = re.compile(
+    r"^(?P<key>cuda|hip)\s*(?::[^=\n]*)?=\s*(?:'(?P<single>[^'\n]*)'|\"(?P<double>[^\"\n]*)\"|None)\s*$",
+    re.MULTILINE,
+)
+
 
 def python_facts() -> dict[str, object]:
     enable_user_site = site.ENABLE_USER_SITE
@@ -79,6 +90,86 @@ def distributions() -> list[dict[str, str]]:
             {"name": normalize(name), "version": version, "location": str(dist.locate_file(""))}
         )
     return sorted(found, key=lambda d: (d["name"], d["location"]))
+
+
+def torch_facts() -> dict[str, object] | None:
+    """Static signals about the torch that ``import torch`` would find, without importing it.
+
+    Returns None when torch is not installed.
+    """
+    try:
+        from importlib import metadata
+    except ImportError:  # Python before 3.8: the distributions section still lists torch
+        return None
+    try:
+        dist = metadata.distribution("torch")
+    except metadata.PackageNotFoundError:
+        return None
+    requirements = []
+    for requirement in dist.requires or []:
+        match = re.match(r"[A-Za-z0-9._-]+", requirement)
+        if match and normalize(match.group(0)).startswith("nvidia-"):
+            requirements.append(normalize(match.group(0)))
+    package = str(dist.locate_file("torch"))
+    return {
+        "version": dist.version,
+        "location": str(dist.locate_file("")),
+        "requires_nvidia": sorted(set(requirements)),
+        "libraries": torch_libraries(os.path.join(package, "lib")),
+        "version_py": torch_version_py(os.path.join(package, "version.py")),
+        "conda_records": conda_records(sys.prefix),
+    }
+
+
+def conda_records(prefix: str) -> list[str] | None:
+    """Conda packages that decide the torch build, by file name in conda-meta.
+
+    Names like ``pytorch-1.12.0-py3.8_cuda11.3_cudnn8.3.2_0`` carry the build string, so
+    the (multi-megabyte) records are never opened. None outside conda environments.
+    """
+    try:
+        names = os.listdir(os.path.join(prefix, "conda-meta"))
+    except OSError:
+        return None
+    wanted_prefixes = ("pytorch-", "cudatoolkit-", "cuda-version-", "cuda-runtime-")
+    return sorted(
+        name[: -len(".json")]
+        for name in names
+        if name.endswith(".json") and name.startswith(wanted_prefixes)
+    )
+
+
+def torch_version_py(path: str) -> dict[str, str | None] | None:
+    """The cuda and hip versions torch was built with, read from torch/version.py as text.
+
+    None when the file is missing or names neither (a damaged or unusual install).
+    """
+    try:
+        with open(path, "rb") as handle:
+            text = handle.read(MAX_METADATA_BYTES).decode("utf-8", "replace")
+    except OSError:
+        return None
+    found: dict[str, str | None] = {}
+    for match in VERSION_PY_LINE.finditer(text):
+        value = match.group("single")
+        if value is None:
+            value = match.group("double")
+        found.setdefault(match.group("key"), value)
+    if not found:
+        return None
+    return {"cuda": found.get("cuda"), "hip": found.get("hip")}
+
+
+def torch_libraries(lib_dir: str) -> dict[str, bool] | None:
+    """Whether torch/lib holds CUDA or ROCm libraries; None if the folder cannot be read."""
+    try:
+        names = set(os.listdir(lib_dir))
+    except OSError:
+        return None
+    return {
+        "cuda": any(name in names for name in CUDA_LIBRARIES),
+        "hip": any(name in names for name in HIP_LIBRARIES),
+    }
 
 
 def scan_dist_info(paths: list[str]) -> list[dict[str, str]]:
@@ -130,7 +221,9 @@ def collect(sections: list[tuple[str, Callable[[], object]]]) -> dict[str, objec
 
 
 def main() -> None:
-    result = collect([("python", python_facts), ("distributions", distributions)])
+    result = collect(
+        [("python", python_facts), ("distributions", distributions), ("torch", torch_facts)]
+    )
     sys.stdout.write(BEGIN + json.dumps(result, ensure_ascii=True, sort_keys=True) + END + "\n")
     sys.stdout.flush()
 
