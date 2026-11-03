@@ -15,6 +15,7 @@ from rich.console import Console
 
 from gpu_stack_inspector import __version__, orchestrator
 from gpu_stack_inspector.exit_codes import ExitCode
+from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
 from gpu_stack_inspector.reports.json_report import render_json
 from gpu_stack_inspector.reports.terminal import render_terminal
@@ -84,12 +85,31 @@ def inspect(
     them beyond the standard library.
     """
     pythons = python or orchestrator.default_interpreters()
+    if not pythons:
+        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
     snapshot = orchestrator.inspect(SubprocessRunner(), pythons)
     redacted = Redactor(RedactionContext.current()).redact(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
     else:
         render_terminal(redacted, Console())
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+_UNUSABLE = frozenset({FailureKind.NOT_FOUND, FailureKind.PERMISSION_DENIED})
+
+
+def _unusable_interpreters(snapshot: Snapshot) -> bool:
+    """A named interpreter that could not even be started: exit code 3, after the report.
+
+    An interpreter that starts and then crashes is a finding about that environment,
+    not missing context, so it does not count.
+    """
+    return any(
+        interpreter.version is None and any(f.kind in _UNUSABLE for f in interpreter.failures)
+        for interpreter in snapshot.interpreters
+    )
 
 
 def main() -> None:

@@ -12,9 +12,11 @@ import pytest
 from gpu_stack_inspector import cli, orchestrator
 from gpu_stack_inspector.models import (
     Distribution,
+    FailureKind,
     HostFacts,
     InterpreterFacts,
     NvidiaFacts,
+    ProbeFailure,
     Snapshot,
 )
 from gpu_stack_inspector.privacy import RedactionContext, strip_control
@@ -102,3 +104,33 @@ def test_without_python_the_python_on_path_is_inspected(
     monkeypatch.setattr(orchestrator, "default_interpreters", lambda: ["/usr/bin/python3"])
     assert run_main(monkeypatch, "inspect", "--format", "json") == 0
     assert requested == [["/usr/bin/python3"]]
+
+
+def _with_interpreter(monkeypatch: pytest.MonkeyPatch, interpreter: InterpreterFacts) -> None:
+    snapshot = Snapshot("0.1.0", "t", interpreters=(interpreter,))
+    monkeypatch.setattr(orchestrator, "inspect", lambda runner, pythons, **_: snapshot)
+
+
+def test_an_interpreter_that_cannot_be_started_exits_3_after_the_report(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], requested: list[Any]
+) -> None:
+    missing = ProbeFailure("python", FailureKind.NOT_FOUND, "/gone/python does not exist")
+    _with_interpreter(monkeypatch, InterpreterFacts("A", "/gone/python", failures=(missing,)))
+    assert run_main(monkeypatch, "inspect", "-p", "/gone/python", "--format", "json") == 3
+    assert json.loads(capsys.readouterr().out)["interpreters"][0]["path"] == "/gone/python"
+
+
+def test_an_interpreter_that_crashes_is_a_finding_not_missing_context(
+    monkeypatch: pytest.MonkeyPatch, requested: list[Any]
+) -> None:
+    crash = ProbeFailure("python", FailureKind.NONZERO_EXIT, "exited with code 1")
+    _with_interpreter(monkeypatch, InterpreterFacts("A", "/broken/python", failures=(crash,)))
+    assert run_main(monkeypatch, "inspect", "-p", "/broken/python", "--format", "json") == 0
+
+
+def test_no_python_on_path_is_explained(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], requested: list[Any]
+) -> None:
+    monkeypatch.setattr(orchestrator, "default_interpreters", lambda: [])
+    assert run_main(monkeypatch, "inspect", "--format", "json") == 0
+    assert "No python found on PATH" in capsys.readouterr().err
