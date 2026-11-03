@@ -145,3 +145,33 @@ class HostFacts:
     """``PRETTY_NAME`` from os-release on Linux, e.g. ``Ubuntu 26.04.1 LTS``."""
     wsl: bool = False
     """Running inside Windows Subsystem for Linux (a fact only; WSL is not validated yet)."""
+
+
+@dataclass(frozen=True, slots=True)
+class GpuDevice:
+    """One GPU as nvidia-smi lists it. Values it reports as N/A are ``None``."""
+
+    index: int
+    name: str
+    memory_total_mib: int | None = None
+    compute_capability: str | None = None
+    """``major.minor``, e.g. ``8.6``; decides which CUDA kernels a wheel can run."""
+
+
+@dataclass(frozen=True, slots=True)
+class NvidiaFacts:
+    """What nvidia-smi reported.
+
+    ``smi_path`` is ``None`` when nvidia-smi is not installed (or not on ``PATH``), which
+    is a fact, not a failure. ``failures`` say why other fields are missing.
+    """
+
+    smi_path: str | None
+    driver_version: str | None = None
+    max_cuda_version: str | None = None
+    """The newest CUDA version the driver supports (nvidia-smi's "CUDA Version").
+
+    It is not the version of any installed CUDA toolkit or of PyTorch's CUDA runtime.
+    """
+    gpus: tuple[GpuDevice, ...] = ()
+    failures: tuple[ProbeFailure, ...] = ()

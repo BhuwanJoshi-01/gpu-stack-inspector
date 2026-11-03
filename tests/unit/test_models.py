@@ -9,6 +9,8 @@ from gpu_stack_inspector.models import (
     Evidence,
     FailureKind,
     Finding,
+    GpuDevice,
+    NvidiaFacts,
     ProbeFailure,
     Severity,
     Snapshot,
@@ -104,3 +106,16 @@ def test_snapshot_carries_schema_and_tool_version() -> None:
 
 def test_utc_timestamp_is_iso_8601_utc() -> None:
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", utc_timestamp())
+
+
+def test_nvidia_facts_without_nvidia_smi_have_no_gpus_and_no_failures() -> None:
+    facts = NvidiaFacts(smi_path=None)
+    assert facts.gpus == ()
+    assert facts.failures == ()
+    assert facts.max_cuda_version is None
+
+
+def test_gpu_device_values_default_to_unknown() -> None:
+    gpu = GpuDevice(index=0, name="NVIDIA GeForce RTX 3050 Laptop GPU")
+    assert gpu.memory_total_mib is None
+    assert gpu.compute_capability is None
