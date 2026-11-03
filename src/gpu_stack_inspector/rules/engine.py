@@ -6,7 +6,7 @@ import inspect
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 
-from gpu_stack_inspector.models import FINDING_ID, Finding, Snapshot
+from gpu_stack_inspector.models import FINDING_ID, Confidence, Finding, Severity, Snapshot, Status
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,3 +63,39 @@ class Registry:
 
     def get(self, rule_id: str) -> Rule | None:
         return self._rules.get(rule_id.upper())
+
+
+def evaluate(
+    snapshot: Snapshot, rules: Iterable[Rule], context: RuleContext | None = None
+) -> tuple[Finding, ...]:
+    """Run every rule in order and collect their findings.
+
+    A rule may only report findings under its own code. A rule that raises is a bug in
+    this tool; it becomes an ``unknown`` finding for that check instead of hiding every
+    other result, and never a pass.
+    """
+    context = context or RuleContext()
+    findings: list[Finding] = []
+    for rule in rules:
+        try:
+            produced = list(rule.check(snapshot, context))
+        except Exception as exc:  # report the broken check, keep the others
+            findings.append(_internal_error(rule, exc))
+            continue
+        for finding in produced:
+            if finding.id != rule.id:
+                raise ValueError(f"rule {rule.id} reported a finding as {finding.id}")
+        findings.extend(produced)
+    return tuple(findings)
+
+
+def _internal_error(rule: Rule, exc: Exception) -> Finding:
+    return Finding(
+        id=rule.id,
+        status=Status.UNKNOWN,
+        severity=Severity.LOW,
+        confidence=Confidence.LOW,
+        summary=f"{rule.title}: not checked because of an internal error",
+        reason=f"The check failed with {type(exc).__name__}: {exc}",
+        recommended_action="Please report this as a bug, with the redacted report.",
+    )
