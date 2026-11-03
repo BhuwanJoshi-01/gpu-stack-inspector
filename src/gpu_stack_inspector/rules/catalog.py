@@ -9,6 +9,10 @@ RULES = Registry()
 
 def builtin_rules() -> Registry:
     """All built-in rules: host first, then interpreters, then compatibility."""
-    from gpu_stack_inspector.rules import host, interpreters  # noqa: F401 - register on import
+    from gpu_stack_inspector.rules import (  # noqa: F401 - register on import
+        compatibility,
+        host,
+        interpreters,
+    )
 
     return RULES
