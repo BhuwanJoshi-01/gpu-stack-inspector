@@ -17,6 +17,7 @@ from gpu_stack_inspector.models import (
 )
 from gpu_stack_inspector.rules.catalog import RULES
 from gpu_stack_inspector.rules.engine import RuleContext
+from gpu_stack_inspector.rules.torch_build import TorchBuildKind, classify_torch
 
 _MINOR_URL = "https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html"
 
@@ -150,3 +151,97 @@ def nvcc_supported(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding
         recommended_action="Update the NVIDIA driver, or use a CUDA toolkit the driver supports.",
         verify_command="nvidia-smi",
     )
+
+
+@RULES.rule(
+    "GSI-CUDA-003",
+    "The driver supports the CUDA version PyTorch was built for",
+    sources=(_MINOR_URL,),
+)
+def torch_cuda_supported(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether the driver can run the CUDA version each CUDA build of PyTorch targets.
+
+    A build for a newer CUDA major release than the driver supports cannot initialise
+    CUDA at all (unless NVIDIA's forward-compatibility package is installed, which is
+    rare outside data centres). A newer minor version of the same release family usually
+    works through minor version compatibility; operations that need the newer driver fail
+    with cudaErrorCallRequiresNewerDriver.
+    """
+    nvidia = snapshot.nvidia
+    driver_max = major_minor(nvidia.max_cuda_version) if nvidia else None
+    driver_text = nvidia.max_cuda_version if nvidia else None
+    for interpreter in snapshot.interpreters:
+        if interpreter.torch is None:
+            continue
+        build = classify_torch(interpreter.torch)
+        target = major_minor(build.cuda_version)
+        if build.kind is not TorchBuildKind.CUDA or target is None:
+            continue
+        if driver_max is None:
+            cause = _driver_cause(snapshot)
+            if cause is not None:
+                yield Finding(
+                    id="GSI-CUDA-003",
+                    status=Status.NOT_TESTED,
+                    severity=Severity.INFO,
+                    confidence=Confidence.HIGH,
+                    summary=f"CUDA {build.cuda_version} was not compared with the driver",
+                    reason="The driver's CUDA version is not known.",
+                    subject=interpreter.label,
+                    caused_by=cause,
+                )
+            continue
+        evidence = (
+            Evidence("torch", "cuda_version", build.cuda_version),
+            Evidence("nvidia-smi", "max_cuda_version", driver_text),
+        )
+        support = _support(target, driver_max)
+        if support is _Support.SUPPORTED:
+            yield Finding(
+                id="GSI-CUDA-003",
+                status=Status.PASS,
+                severity=Severity.INFO,
+                confidence=Confidence.HIGH,
+                summary=f"The driver supports CUDA {build.cuda_version}",
+                reason=(
+                    f"torch targets CUDA {build.cuda_version}; "
+                    f"the driver supports up to {driver_text}."
+                ),
+                subject=interpreter.label,
+                evidence=evidence,
+            )
+            continue
+        newer_major = support is _Support.NEWER_MAJOR
+        yield Finding(
+            id="GSI-CUDA-003",
+            status=Status.FAIL if newer_major else Status.WARN,
+            severity=Severity.HIGH if newer_major else Severity.MEDIUM,
+            confidence=Confidence.HIGH,
+            summary=(
+                f"torch is built for CUDA {build.cuda_version}, newer than the driver supports"
+            ),
+            reason=(
+                f"The driver supports CUDA up to {driver_text}."
+                + (
+                    _minimum_driver_sentence(target[0]) + " CUDA will not initialise."
+                    if newer_major
+                    else " Minor version compatibility usually lets it run, but operations "
+                    "that need a newer driver fail with cudaErrorCallRequiresNewerDriver."
+                )
+            ),
+            subject=interpreter.label,
+            evidence=evidence,
+            recommended_action=(
+                f"Update the NVIDIA driver, or install a torch build for CUDA {driver_text} or "
+                "older from https://pytorch.org/get-started/locally/."
+            ),
+            verify_command="nvidia-smi",
+            limitations=(
+                (
+                    "NVIDIA's forward-compatibility package (cuda-compat) can bridge major "
+                    "versions on supported data-centre GPUs; it is not detected.",
+                )
+                if newer_major
+                else ()
+            ),
+        )
