@@ -1,1 +1,5 @@
-GSI-RUNTIME-BEGIN{"protocol": 1, "steps": [{"ok": true, "seconds": 0.996, "step": "import torch", "value": {"cuda": "13.0", "version": "2.14.1+cu130"}}, {"ok": true, "seconds": 0.049, "step": "cuda available", "value": true}, {"ok": true, "seconds": 0.015, "step": "devices", "value": [{"capability": "8.6", "index": 0, "name": "NVIDIA GeForce RTX 3050 Laptop GPU"}]}, {"ok": true, "seconds": 0.293, "step": "tensor operation", "value": 32.0}]}GSI-RUNTIME-END
+GSI-RUNTIME-STEP import torch
+GSI-RUNTIME-STEP cuda available
+GSI-RUNTIME-STEP devices
+GSI-RUNTIME-STEP tensor operation
+GSI-RUNTIME-BEGIN{"protocol": 1, "steps": [{"ok": true, "seconds": 0.834, "step": "import torch", "value": {"cuda": "13.0", "version": "2.14.1+cu130"}}, {"ok": true, "seconds": 0.043, "step": "cuda available", "value": true}, {"ok": true, "seconds": 0.013, "step": "devices", "value": [{"capability": "8.6", "index": 0, "name": "NVIDIA GeForce RTX 3050 Laptop GPU"}]}, {"ok": true, "seconds": 0.195, "step": "tensor operation", "value": 32.0}]}GSI-RUNTIME-END
