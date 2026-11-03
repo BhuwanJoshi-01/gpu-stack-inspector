@@ -72,7 +72,6 @@ def test_short_or_generic_names_are_not_treated_as_secrets() -> None:
 # --- secrets ------------------------------------------------------------------------------
 
 
-@pending
 @pytest.mark.parametrize(
     ("raw", "clean"),
     [
@@ -105,7 +104,6 @@ def test_ordinary_settings_are_left_alone(harmless: str) -> None:
     assert text(harmless) == harmless
 
 
-@pending
 @pytest.mark.parametrize(
     ("raw", "clean"),
     [
@@ -122,7 +120,6 @@ def test_urls_without_credentials_are_left_alone() -> None:
     assert text("https://pypi.org/simple/torch/") == "https://pypi.org/simple/torch/"
 
 
-@pending
 @pytest.mark.parametrize(
     "token",
     [
@@ -140,7 +137,6 @@ def test_known_token_formats_are_hidden_anywhere(token: str) -> None:
     assert text(f"error: {token} rejected") == "error: <redacted-token> rejected"
 
 
-@pending
 def test_bearer_tokens_are_hidden() -> None:
     assert text("Authorization: Bearer abc.def.ghi123") == "Authorization: Bearer <redacted-token>"
 

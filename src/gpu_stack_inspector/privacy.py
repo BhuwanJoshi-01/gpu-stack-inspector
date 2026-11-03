@@ -59,6 +59,41 @@ def _safe(read: Callable[[], str]) -> str | None:
 
 Replacement = str | Callable[[re.Match[str]], str]
 
+_REDACTED = "<redacted>"
+_REDACTED_TOKEN = "<redacted-token>"  # noqa: S105 - the placeholder, not a token
+
+_URL_CREDENTIALS = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]*://)([^/\s?#]*)@")
+"""``scheme://user:password@`` — greedy up to the last ``@`` of the authority."""
+
+_ASSIGNMENT = re.compile(
+    r"""(?<![\w-])([A-Za-z_][A-Za-z0-9_]*)(["']?\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)"""
+)
+"""``NAME=value``, ``name: value``, ``"name": "value"``; the name decides if it is secret."""
+
+_SECRET_SUFFIXES = ("token", "secret", "password", "passwd", "apikey", "credential", "credentials")
+_SECRET_PARTS = frozenset({"key", "auth", "pass", "pat"})
+
+_TOKENS = re.compile(
+    r"(?<![A-Za-z0-9_-])(?:"
+    r"gh[pousr]_[A-Za-z0-9]{36,}"  # GitHub
+    r"|github_pat_[A-Za-z0-9_]{22,}"
+    r"|hf_[A-Za-z0-9]{30,}"  # Hugging Face
+    r"|sk-[A-Za-z0-9_-]{20,}"  # OpenAI, Anthropic
+    r"|(?:AKIA|ASIA)[0-9A-Z]{16}"  # AWS access key id
+    r"|xox[abprs]-[A-Za-z0-9-]{10,}"  # Slack
+    r"|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"  # JWT
+    r")(?![A-Za-z0-9_-])"
+)
+_BEARER = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}")
+
+
+def _is_secret_name(name: str) -> bool:
+    """``HF_TOKEN``, ``accessToken``, ``DB_PASSWORD``, ``OPENAI_API_KEY``: yes.
+    ``tokenizers``, ``CUDA_HOME``, ``author``, ``KEYBOARD``: no."""
+    parts = [part for part in name.lower().split("_") if part]
+    return any(part in _SECRET_PARTS or part.endswith(_SECRET_SUFFIXES) for part in parts)
+
+
 _MIN_NAME_LENGTH = 3
 _GENERIC_NAMES = frozenset(
     {
@@ -114,7 +149,29 @@ class Redactor:
     def text(self, value: str) -> str:
         """Return ``value`` without control characters, identifying or secret values."""
         result = strip_control(value)
+        result = _URL_CREDENTIALS.sub(self._url_credentials, result)
+        result = _ASSIGNMENT.sub(self._assignment, result)
+        for token_pattern, placeholder in (
+            (_TOKENS, _REDACTED_TOKEN),
+            (_BEARER, r"\1" + _REDACTED_TOKEN),
+        ):
+            result, count = token_pattern.subn(placeholder, result)
+            self._counts["token"] += count
         for category, pattern, replacement in self._steps:
             result, count = pattern.subn(replacement, result)
             self._counts[category] += count
         return result
+
+    def _url_credentials(self, match: re.Match[str]) -> str:
+        scheme, credentials = match.group(1), match.group(2)
+        if credentials == _REDACTED:
+            return match.group(0)
+        self._counts["url_credentials"] += 1
+        return f"{scheme}{_REDACTED}@"
+
+    def _assignment(self, match: re.Match[str]) -> str:
+        name, separator, value = match.groups()
+        if not _is_secret_name(name) or value.startswith("<redacted"):
+            return match.group(0)
+        self._counts["secret_value"] += 1
+        return f"{name}{separator}{_REDACTED}"
