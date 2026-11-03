@@ -7,7 +7,7 @@ import sys
 import pytest
 
 from gpu_stack_inspector import __version__, cli
-from gpu_stack_inspector.privacy import RedactionContext
+from gpu_stack_inspector.privacy import RedactionContext, strip_control
 
 
 def run_main(monkeypatch: pytest.MonkeyPatch, *args: str) -> int:
@@ -28,7 +28,8 @@ def test_help_explains_the_tool_and_its_promises(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], flag: str
 ) -> None:
     assert run_main(monkeypatch, flag) == 0
-    out = " ".join(capsys.readouterr().out.split())
+    # Rich colours the help where it detects CI (GitHub Actions); compare the plain text.
+    out = " ".join(strip_control(capsys.readouterr().out).split())
     assert "one Python environment but not another" in out
     assert "read-only" in out
     assert "--version" in out
@@ -46,7 +47,7 @@ def test_unknown_option_is_a_usage_error(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run_main(monkeypatch, "--bogus") == 2
-    assert "No such option" in capsys.readouterr().err
+    assert "No such option" in strip_control(capsys.readouterr().err)
 
 
 def test_unexpected_errors_print_one_redacted_line_and_exit_2(
