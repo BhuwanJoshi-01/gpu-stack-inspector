@@ -52,7 +52,8 @@ tests/
   fixtures/       real and synthetic captures, each set with a README saying which is which
   unit/           unit tests (no GPU needed)
   integration/    real-machine tests, only with GSI_INTEGRATION=1
-docs/roadmap.md   requirement IDs GPU-001 … and what v0.1 includes
+docs/             roadmap (requirement IDs GPU-001 …), architecture, privacy, troubleshooting,
+                  support-matrix, cli, json-output + json-schema-v1.json, PUBLISHING
 .github/          CI, issue forms, PR template
 ```
 
