@@ -6,8 +6,6 @@ from typing import Any
 
 import pytest
 
-pending = pytest.mark.xfail(strict=True, reason="GPU-007: redactor pending")
-
 
 def redactor(**context: Any) -> Any:
     from gpu_stack_inspector.privacy import RedactionContext, Redactor
@@ -154,7 +152,6 @@ def test_redaction_is_idempotent() -> None:
 # --- whole objects ----------------------------------------------------------------------
 
 
-@pending
 def test_redact_returns_a_redacted_copy_of_nested_dataclasses() -> None:
     from gpu_stack_inspector.models import (
         Confidence,
@@ -197,7 +194,6 @@ def test_redact_returns_a_redacted_copy_of_nested_dataclasses() -> None:
     assert snapshot.findings[0].summary.startswith("Interpreter /home/alice")  # original untouched
 
 
-@pending
 def test_redact_handles_plain_containers_and_leaves_other_values_alone() -> None:
     data = {"path": "/home/alice/x", "items": ["/home/alice/y", 3, None, True], "t": ("alice",)}
     assert redactor().redact(data) == {
@@ -207,7 +203,6 @@ def test_redact_handles_plain_containers_and_leaves_other_values_alone() -> None
     }
 
 
-@pending
 def test_summary_counts_what_was_redacted() -> None:
     r = redactor()
     r.text("/home/alice/a /home/alice/b HF_TOKEN=x postgres://u:p@h/db alice")

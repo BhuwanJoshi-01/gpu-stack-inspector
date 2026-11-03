@@ -11,8 +11,12 @@ import re
 import socket
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
+from enum import Enum
 from pathlib import Path
+from typing import Any, TypeVar, cast
+
+T = TypeVar("T")
 
 _ESCAPE_SEQUENCE = re.compile(
     r"\x1b\[[0-?]*[ -/]*[@-~]"  # CSI: colours, cursor movement, screen clearing
@@ -161,6 +165,36 @@ class Redactor:
             result, count = pattern.subn(replacement, result)
             self._counts[category] += count
         return result
+
+    def redact(self, obj: T) -> T:
+        """Return a redacted copy of ``obj``.
+
+        Strings are redacted; dataclasses (frozen ones too), tuples, lists and dicts are
+        copied with their contents redacted; enums, numbers, booleans and ``None`` are
+        returned unchanged. The original object is never modified.
+        """
+        return cast(T, self._redact(obj))
+
+    @property
+    def summary(self) -> dict[str, int]:
+        """How many values of each kind this redactor has removed so far."""
+        return {category: count for category, count in self._counts.items() if count}
+
+    def _redact(self, obj: Any) -> Any:
+        if isinstance(obj, Enum):  # StrEnum members are str; keep them as they are
+            return obj
+        if isinstance(obj, str):
+            return self.text(obj)
+        if is_dataclass(obj) and not isinstance(obj, type):
+            changes = {f.name: self._redact(getattr(obj, f.name)) for f in fields(obj) if f.init}
+            return replace(obj, **changes)
+        if isinstance(obj, tuple):
+            return tuple(self._redact(item) for item in obj)
+        if isinstance(obj, list):
+            return [self._redact(item) for item in obj]
+        if isinstance(obj, dict):
+            return {self._redact(key): self._redact(item) for key, item in obj.items()}
+        return obj
 
     def _url_credentials(self, match: re.Match[str]) -> str:
         scheme, credentials = match.group(1), match.group(2)
