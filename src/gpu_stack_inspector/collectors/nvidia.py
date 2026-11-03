@@ -8,7 +8,7 @@ import shutil
 from collections.abc import Callable, Sequence
 
 from gpu_stack_inspector.models import FailureKind, GpuDevice, NvidiaFacts, ProbeFailure
-from gpu_stack_inspector.runner import CommandRunner, probe_failure
+from gpu_stack_inspector.runner import CommandResult, CommandRunner, Outcome, probe_failure
 
 PROBE = "nvidia-smi"
 TIMEOUT = 8.0
@@ -39,6 +39,14 @@ def collect_nvidia(
         return NvidiaFacts(smi_path=None)
 
     result = runner.run(_query_argv(smi, _FIELDS), timeout=timeout, env_overrides=_ENV)
+    if _no_devices(result):
+        # The driver answered but sees no GPU: zero devices is the fact to report.
+        versions = _versions(runner, smi, timeout)
+        return NvidiaFacts(
+            smi_path=smi,
+            driver_version=versions.get("driver version"),
+            max_cuda_version=versions.get("cuda version"),
+        )
     failure = probe_failure(PROBE, result)
     if failure is not None:
         return NvidiaFacts(smi_path=smi, failures=(failure,))
@@ -66,6 +74,10 @@ def _versions(runner: CommandRunner, smi: str, timeout: float) -> dict[str, str]
         match["key"].strip().lower(): match["value"]
         for match in _VERSION_LINE.finditer(result.stdout)
     }
+
+
+def _no_devices(result: CommandResult) -> bool:
+    return result.outcome is Outcome.NONZERO and "no devices were found" in result.stdout.lower()
 
 
 def _query_argv(smi: str, fields: Sequence[str]) -> list[str]:

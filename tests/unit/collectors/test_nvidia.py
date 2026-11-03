@@ -103,7 +103,6 @@ def test_driver_not_loaded_is_a_failure_and_stops_further_queries() -> None:
     assert [call.argv for call in runner.calls] == [QUERY]
 
 
-@pending
 def test_no_devices_found_means_zero_gpus_not_a_failure() -> None:
     runner = FakeRunner()
     runner.script(*QUERY, stdout=fixture("no-devices.stdout.txt"), returncode=6)
