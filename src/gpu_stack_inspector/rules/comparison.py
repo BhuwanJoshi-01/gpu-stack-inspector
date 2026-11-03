@@ -44,9 +44,29 @@ _TORCH_FIELDS: tuple[tuple[str, Callable[[InterpreterFacts], str | None]], ...] 
 )
 
 
+def _package_version(interpreter: InterpreterFacts, name: str) -> str | None:
+    """The installed version; several installs of one package (shadowing) are all named."""
+    versions = [d.version for d in interpreter.distributions if d.name == name]
+    if not versions:
+        return None
+    if len(versions) == 1:
+        return versions[0]
+    return f"{', '.join(sorted(set(versions)))} ({len(versions)} installs)"
+
+
 def compare_interpreters(interpreters: Sequence[InterpreterFacts]) -> tuple[FieldComparison, ...]:
-    """Rows for every compared field, in a fixed order; ``differs`` marks disagreement."""
-    return tuple(
+    """Rows for every compared field, in a fixed order; ``differs`` marks disagreement.
+
+    After the interpreter and torch rows comes one row per GPU-relevant package found in
+    any of them, alphabetically; ``None`` there means "not installed".
+    """
+    fixed = tuple(
         FieldComparison(name, tuple(value(i) for i in interpreters))
         for name, value in (*_INTERPRETER_FIELDS, *_TORCH_FIELDS)
     )
+    names = sorted({d.name for i in interpreters for d in i.distributions} - {"torch"})
+    packages = tuple(
+        FieldComparison(name, tuple(_package_version(i, name) for i in interpreters))
+        for name in names
+    )
+    return fixed + packages

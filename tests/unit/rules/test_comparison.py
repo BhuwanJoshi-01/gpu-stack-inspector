@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from gpu_stack_inspector.models import FieldComparison, InterpreterFacts, TorchFacts
+from gpu_stack_inspector.models import Distribution, FieldComparison, InterpreterFacts, TorchFacts
 from gpu_stack_inspector.rules.comparison import compare_interpreters
 
 CONDA = InterpreterFacts(
@@ -71,3 +71,33 @@ def test_an_environment_without_torch_says_not_installed() -> None:
     assert result["torch"].values == ("2.11.0+cu128", None)
     assert result["torch build"].values == ("CUDA 12.8", "not installed")
     assert result["torch build"].differs
+
+
+def test_every_package_found_anywhere_gets_a_row() -> None:
+    a = replace(
+        CONDA,
+        distributions=(
+            Distribution("torch", "2.11.0+cu128", "/a"),
+            Distribution("nvidia-cudnn-cu12", "9.10.2.21", "/a"),
+            Distribution("numpy", "2.4.4", "/a"),
+        ),
+    )
+    b = replace(VENV, distributions=(Distribution("numpy", "2.4.4", "/b"),))
+    result = rows(a, b)
+    assert result["nvidia-cudnn-cu12"].values == ("9.10.2.21", None)
+    assert result["nvidia-cudnn-cu12"].differs
+    assert not result["numpy"].differs
+    package_rows = [r.field for r in compare_interpreters([a, b])][-2:]
+    assert package_rows == ["numpy", "nvidia-cudnn-cu12"]
+    assert "torch" not in package_rows  # covered by the torch rows
+
+
+def test_a_package_installed_twice_says_so() -> None:
+    shadowed = replace(
+        CONDA,
+        distributions=(
+            Distribution("numpy", "1.26.4", "~/.local/lib"),
+            Distribution("numpy", "2.4.4", "/a"),
+        ),
+    )
+    assert rows(shadowed)["numpy"].values == ("1.26.4, 2.4.4 (2 installs)",)
