@@ -6,7 +6,7 @@ import json
 import os
 import re
 import shutil
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from gpu_stack_inspector.models import CudaToolkit, FailureKind, ProbeFailure, ToolkitFacts
@@ -17,6 +17,9 @@ DEFAULT_ROOTS: tuple[Path, ...] = () if os.name == "nt" else (Path("/usr/local")
 """Where toolkits are installed: /usr/local/cuda-12.4 (NVIDIA's installer), /opt/cuda (Arch)."""
 
 _MAX_FILE_BYTES = 64 * 1024
+_PROBE = "cuda-toolkits"
+_ENV_DIRS = ("CUDA_HOME", "CUDA_PATH", "CUDA_ROOT")
+"""Variables naming a toolkit; Windows also sets one CUDA_PATH_V<major>_<minor> per version."""
 _TOOLKIT_DIR = re.compile(r"cuda(?:-[0-9]+(?:\.[0-9]+)*)?")
 _VERSION_TXT = re.compile(r"CUDA Version\s+(?P<version>[0-9]+(?:\.[0-9]+)+)")
 _CUDA_H = re.compile(r"^\s*#\s*define\s+CUDA_VERSION\s+(?P<number>[0-9]{4,6})\b", re.MULTILINE)
@@ -31,6 +34,7 @@ def collect_toolkits(
     *,
     which: Callable[[str], str | None] = shutil.which,
     roots: Sequence[Path] = DEFAULT_ROOTS,
+    environ: Mapping[str, str] = os.environ,
     timeout: float = TIMEOUT,
 ) -> ToolkitFacts:
     """Find CUDA toolkit directories and the nvcc on PATH.
@@ -38,29 +42,66 @@ def collect_toolkits(
     Directories are only listed and small version files read; the only command run is
     ``nvcc --version``.
     """
-    toolkits = tuple(find_toolkits(roots))
+    toolkits, dir_failures = find_toolkits(roots, environ)
     nvcc_facts = _collect_nvcc(runner, which, timeout)
     return ToolkitFacts(
         nvcc_path=nvcc_facts.nvcc_path,
         nvcc_version=nvcc_facts.nvcc_version,
-        toolkits=toolkits,
-        failures=nvcc_facts.failures,
+        toolkits=tuple(toolkits),
+        failures=(*dir_failures, *nvcc_facts.failures),
     )
 
 
-def find_toolkits(roots: Sequence[Path]) -> list[CudaToolkit]:
-    """``cuda`` and ``cuda-X.Y`` directories directly under each root, with their version."""
-    toolkits: list[CudaToolkit] = []
+def find_toolkits(
+    roots: Sequence[Path], environ: Mapping[str, str] | None = None
+) -> tuple[list[CudaToolkit], list[ProbeFailure]]:
+    """Toolkit directories under each root and named by CUDA_HOME/CUDA_PATH/….
+
+    Each directory is reported once under its real path; symlinks to it, such as
+    ``/usr/local/cuda``, are listed in ``linked_from``. A variable that names a missing
+    directory is a failure worth reporting: tools that read it will not find CUDA.
+    """
+    candidates: list[Path] = []
     for root in roots:
         try:
             entries = sorted(root.iterdir())
         except OSError:  # a missing or unreadable root is normal
             continue
-        for entry in entries:
-            if _TOOLKIT_DIR.fullmatch(entry.name) and entry.is_dir():
-                version, source = read_toolkit_version(entry)
-                toolkits.append(CudaToolkit(str(entry), version, source))
-    return toolkits
+        candidates.extend(entry for entry in entries if _TOOLKIT_DIR.fullmatch(entry.name))
+
+    failures: list[ProbeFailure] = []
+    env = environ or {}
+    names = [*_ENV_DIRS, *sorted(n for n in env if n.startswith("CUDA_PATH_V"))]
+    for name in names:
+        value = env.get(name, "")
+        if not value:
+            continue
+        if Path(value).is_dir():
+            candidates.append(Path(value))
+        else:
+            failures.append(
+                ProbeFailure(
+                    _PROBE, FailureKind.NOT_FOUND, f"{name} names {value}, which is not a directory"
+                )
+            )
+
+    aliases: dict[Path, list[str]] = {}
+    for candidate in candidates:
+        try:
+            target = candidate.resolve(strict=True)
+        except OSError:  # dangling symlink
+            continue
+        if not target.is_dir():
+            continue
+        links = aliases.setdefault(target, [])
+        if candidate.is_symlink() and str(candidate) not in links:
+            links.append(str(candidate))
+
+    toolkits = []
+    for target, links in aliases.items():
+        version, source = read_toolkit_version(target)
+        toolkits.append(CudaToolkit(str(target), version, source, tuple(links)))
+    return toolkits, failures
 
 
 def read_toolkit_version(directory: Path) -> tuple[str | None, str | None]:

@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -72,9 +73,9 @@ def test_toolkits_under_the_roots_are_found_with_their_version(tmp_path: Path) -
     usr_local, opt = tmp_path / "usr-local", tmp_path / "opt"
     a = make_toolkit(usr_local, "cuda-12.4", {"cuda": {"name": "CUDA SDK", "version": "12.4.1"}})
     b = make_toolkit(opt, "cuda", {"cuda": {"version": "13.0.2"}})
-    assert find_toolkits([usr_local, opt]) == [
-        CudaToolkit(str(a), "12.4.1", "version.json"),
-        CudaToolkit(str(b), "13.0.2", "version.json"),
+    assert find_toolkits([usr_local, opt])[0] == [
+        CudaToolkit(str(a.resolve()), "12.4.1", "version.json"),
+        CudaToolkit(str(b.resolve()), "13.0.2", "version.json"),
     ]
 
 
@@ -82,18 +83,18 @@ def test_unrelated_directories_and_files_are_ignored(tmp_path: Path) -> None:
     for name in ("cudnn", "cuda-samples", "lib", "cuda_backup"):
         (tmp_path / name).mkdir()
     (tmp_path / "cuda-11.8").write_text("a file, not a toolkit")
-    assert find_toolkits([tmp_path]) == []
+    assert find_toolkits([tmp_path]) == ([], [])
 
 
 def test_missing_roots_are_not_an_error(tmp_path: Path) -> None:
-    assert find_toolkits([tmp_path / "does-not-exist"]) == []
+    assert find_toolkits([tmp_path / "does-not-exist"]) == ([], [])
 
 
 @pytest.mark.parametrize("content", ["{not json", "[]", '{"cuda": {"version": 12}}', ""])
 def test_unusable_version_json_leaves_the_version_unknown(tmp_path: Path, content: str) -> None:
     directory = make_toolkit(tmp_path, "cuda-12.4")
     (directory / "version.json").write_text(content)
-    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory))]
+    assert find_toolkits([tmp_path])[0] == [CudaToolkit(str(directory.resolve()))]
 
 
 def test_huge_version_files_are_read_only_partially(tmp_path: Path) -> None:
@@ -101,13 +102,15 @@ def test_huge_version_files_are_read_only_partially(tmp_path: Path) -> None:
     (directory / "version.json").write_text(
         '{"cuda": {"version": "12.4.1"}, "pad": "' + "x" * 200_000 + '"}'
     )
-    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory))]
+    assert find_toolkits([tmp_path])[0] == [CudaToolkit(str(directory.resolve()))]
 
 
 def test_old_toolkits_are_versioned_by_version_txt(tmp_path: Path) -> None:
     directory = make_toolkit(tmp_path, "cuda-10.2")
     (directory / "version.txt").write_text("CUDA Version 10.2.89\n")
-    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory), "10.2.89", "version.txt")]
+    assert find_toolkits([tmp_path])[0] == [
+        CudaToolkit(str(directory.resolve()), "10.2.89", "version.txt")
+    ]
 
 
 @pytest.mark.parametrize(
@@ -118,10 +121,69 @@ def test_cuda_header_is_the_last_resort(tmp_path: Path, define: str, version: st
     directory = make_toolkit(tmp_path, "cuda")
     (directory / "include").mkdir()
     (directory / "include" / "cuda.h").write_text(f"/* header */\n{define}\n")
-    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory), version, "include/cuda.h")]
+    assert find_toolkits([tmp_path])[0] == [
+        CudaToolkit(str(directory.resolve()), version, "include/cuda.h")
+    ]
 
 
 def test_version_json_wins_over_the_other_sources(tmp_path: Path) -> None:
     directory = make_toolkit(tmp_path, "cuda-12.4", {"cuda": {"version": "12.4.1"}})
     (directory / "version.txt").write_text("CUDA Version 9.0.0\n")
-    assert find_toolkits([tmp_path])[0].version == "12.4.1"
+    assert find_toolkits([tmp_path])[0][0].version == "12.4.1"
+
+
+posix_only = pytest.mark.skipif(
+    os.name != "posix", reason="creating symlinks needs privileges on Windows"
+)
+
+
+@posix_only
+def test_a_symlink_to_a_toolkit_is_an_alias_not_a_second_toolkit(tmp_path: Path) -> None:
+    real = make_toolkit(tmp_path, "cuda-12.4", {"cuda": {"version": "12.4.1"}})
+    (tmp_path / "cuda").symlink_to(real)
+    toolkits, failures = find_toolkits([tmp_path])
+    assert toolkits == [
+        CudaToolkit(str(real.resolve()), "12.4.1", "version.json", (str(tmp_path / "cuda"),))
+    ]
+    assert failures == []
+
+
+@posix_only
+def test_a_dangling_symlink_is_ignored(tmp_path: Path) -> None:
+    (tmp_path / "cuda").symlink_to(tmp_path / "cuda-11.8")
+    assert find_toolkits([tmp_path]) == ([], [])
+
+
+def test_cuda_home_outside_the_roots_is_included(tmp_path: Path) -> None:
+    elsewhere = make_toolkit(tmp_path / "home", "my-cuda", {"cuda": {"version": "12.8.0"}})
+    toolkits, _ = find_toolkits([], {"CUDA_HOME": str(elsewhere)})
+    assert [t.path for t in toolkits] == [str(elsewhere.resolve())]
+
+
+def test_a_toolkit_found_twice_is_listed_once(tmp_path: Path) -> None:
+    directory = make_toolkit(tmp_path, "cuda-12.4", {"cuda": {"version": "12.4.1"}})
+    env = {
+        "CUDA_HOME": str(directory),
+        "CUDA_PATH": str(directory),
+        "CUDA_PATH_V12_4": str(directory),
+    }
+    toolkits, failures = find_toolkits([tmp_path], env)
+    assert len(toolkits) == 1
+    assert failures == []
+
+
+def test_a_variable_naming_a_missing_directory_is_reported(tmp_path: Path) -> None:
+    missing = tmp_path / "cuda-11.8"
+    toolkits, failures = find_toolkits([], {"CUDA_HOME": str(missing), "CUDA_PATH": ""})
+    assert toolkits == []
+    assert [(f.probe, f.kind) for f in failures] == [("cuda-toolkits", FailureKind.NOT_FOUND)]
+    assert failures[0].detail == f"CUDA_HOME names {missing}, which is not a directory"
+
+
+def test_collect_toolkits_combines_directories_and_nvcc(tmp_path: Path) -> None:
+    directory = make_toolkit(tmp_path, "cuda-12.4", {"cuda": {"version": "12.4.1"}})
+    runner = FakeRunner()
+    runner.script(NVCC, "--version", stdout=read_fixture("nvcc", "ubuntu-12.4.version.txt"))
+    facts = collect_toolkits(runner, which=lambda _: NVCC, roots=[tmp_path], environ={})
+    assert facts.nvcc_version == "12.4.131"
+    assert [t.path for t in facts.toolkits] == [str(directory.resolve())]
