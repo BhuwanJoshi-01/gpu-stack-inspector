@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from enum import StrEnum
+
+FINDING_ID = re.compile(r"GSI-[A-Z]+-[0-9]{3}")
+"""Finding codes are part of the public contract: ``GSI-<AREA>-<NNN>``, e.g. ``GSI-TORCH-002``."""
 
 
 class Status(StrEnum):
@@ -36,3 +41,45 @@ class Confidence(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence:
+    """One observed fact that a finding relies on.
+
+    ``source`` names where the fact came from (``nvidia-smi``, ``python-metadata``…),
+    ``key`` what it is (``driver_version``…). ``value`` is ``None`` when the fact is
+    missing, which is itself evidence.
+    """
+
+    source: str
+    key: str
+    value: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Finding:
+    """A diagnosis with everything a user needs to judge and verify it.
+
+    ``subject`` says what the finding is about: ``host`` or the label of an inspected
+    environment. ``verify_command`` is a command the user can run to check the result
+    after acting on ``recommended_action``.
+    """
+
+    id: str
+    status: Status
+    severity: Severity
+    confidence: Confidence
+    summary: str
+    reason: str
+    subject: str = "host"
+    evidence: tuple[Evidence, ...] = ()
+    recommended_action: str | None = None
+    verify_command: str | None = None
+    limitations: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not FINDING_ID.fullmatch(self.id):
+            raise ValueError(f"finding id {self.id!r} does not match GSI-<AREA>-<NNN>")
+        if not self.summary.strip():
+            raise ValueError(f"finding {self.id} has an empty summary")
