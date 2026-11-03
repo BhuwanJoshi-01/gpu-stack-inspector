@@ -7,8 +7,6 @@ import pytest
 from gpu_stack_inspector.models import Confidence, TorchFacts
 from gpu_stack_inspector.rules.torch_build import TorchBuildKind, classify_torch
 
-pending = pytest.mark.xfail(strict=True, reason="GPU-004: torch build classifier pending")
-
 PYTORCH_INDEX_CU128 = TorchFacts(
     version="2.11.0+cu128",
     requires_nvidia=("nvidia-cudnn-cu12", "nvidia-nccl-cu12"),
@@ -53,14 +51,12 @@ ROCM_WHEEL = TorchFacts(
 )
 
 
-@pending
 def test_no_torch_is_missing() -> None:
     build = classify_torch(None)
     assert build.kind is TorchBuildKind.MISSING
     assert build.confidence is Confidence.HIGH
 
 
-@pending
 @pytest.mark.parametrize(
     ("facts", "kind", "cuda"),
     [
@@ -81,7 +77,6 @@ def test_real_kinds_of_install_are_classified_with_high_confidence(
     assert build.evidence
 
 
-@pending
 @pytest.mark.parametrize(
     ("version", "cuda"),
     [
@@ -102,7 +97,6 @@ def test_the_cuda_version_is_read_from_the_tag_when_nothing_else_says(
     )
 
 
-@pending
 def test_a_conda_cpu_build_is_recognised_from_its_records() -> None:
     facts = TorchFacts(
         version="2.3.0",
@@ -111,27 +105,23 @@ def test_a_conda_cpu_build_is_recognised_from_its_records() -> None:
     assert classify_torch(facts).kind is TorchBuildKind.CPU
 
 
-@pending
 def test_a_conda_forge_cuda_build_string_gives_the_version() -> None:
     facts = TorchFacts(version="2.4.1", conda_records=("pytorch-2.4.1-cuda118_py310h6b1e8c4_300",))
     build = classify_torch(facts)
     assert (build.kind, build.cuda_version) == (TorchBuildKind.CUDA, "11.8")
 
 
-@pending
 def test_nvidia_requirements_alone_are_weak_evidence() -> None:
     build = classify_torch(TorchFacts(version="2.14.1", requires_nvidia=("nvidia-cudnn-cu13",)))
     assert (build.kind, build.confidence) == (TorchBuildKind.CUDA, Confidence.LOW)
 
 
-@pending
 def test_no_evidence_at_all_is_unknown() -> None:
     build = classify_torch(TorchFacts(version="2.14.1"))
     assert build.kind is TorchBuildKind.UNKNOWN
     assert build.confidence is Confidence.LOW
 
 
-@pending
 def test_strong_signals_that_disagree_give_unknown_with_the_conflict() -> None:
     damaged = TorchFacts(
         version="2.11.0+cu128",
@@ -147,7 +137,6 @@ def test_strong_signals_that_disagree_give_unknown_with_the_conflict() -> None:
     assert any("+cu128" in conflict for conflict in build.conflicts)
 
 
-@pending
 def test_a_missing_cuda_library_lowers_confidence_but_not_the_verdict() -> None:
     facts = TorchFacts(
         version="2.11.0+cu128",
@@ -161,7 +150,6 @@ def test_a_missing_cuda_library_lowers_confidence_but_not_the_verdict() -> None:
     assert build.conflicts
 
 
-@pending
 def test_every_signal_is_kept_as_evidence() -> None:
     build = classify_torch(CONDA_CUDA)
     keys = {(e.source, e.key) for e in build.evidence}
