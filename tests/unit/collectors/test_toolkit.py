@@ -1,7 +1,14 @@
+import json
+from pathlib import Path
+
 import pytest
 
-from gpu_stack_inspector.collectors.toolkit import collect_toolkits, parse_nvcc_version
-from gpu_stack_inspector.models import FailureKind, ToolkitFacts
+from gpu_stack_inspector.collectors.toolkit import (
+    collect_toolkits,
+    find_toolkits,
+    parse_nvcc_version,
+)
+from gpu_stack_inspector.models import CudaToolkit, FailureKind, ToolkitFacts
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner, read_fixture
 
@@ -23,7 +30,7 @@ NVCC = "/usr/bin/nvcc"
 
 
 def _collect(runner: FakeRunner, nvcc: str | None = NVCC) -> ToolkitFacts:
-    return collect_toolkits(runner, which=lambda name: nvcc if name == "nvcc" else None)
+    return collect_toolkits(runner, which=lambda name: nvcc if name == "nvcc" else None, roots=())
 
 
 def test_without_nvcc_nothing_runs() -> None:
@@ -51,3 +58,47 @@ def test_nvcc_output_without_a_release_is_malformed() -> None:
     runner.script(NVCC, "--version", stdout="something else\n")
     facts = _collect(runner)
     assert [f.kind for f in facts.failures] == [FailureKind.MALFORMED_OUTPUT]
+
+
+def make_toolkit(root: Path, name: str, version_json: object | None = None) -> Path:
+    directory = root / name
+    (directory / "bin").mkdir(parents=True)
+    if version_json is not None:
+        (directory / "version.json").write_text(json.dumps(version_json))
+    return directory
+
+
+def test_toolkits_under_the_roots_are_found_with_their_version(tmp_path: Path) -> None:
+    usr_local, opt = tmp_path / "usr-local", tmp_path / "opt"
+    a = make_toolkit(usr_local, "cuda-12.4", {"cuda": {"name": "CUDA SDK", "version": "12.4.1"}})
+    b = make_toolkit(opt, "cuda", {"cuda": {"version": "13.0.2"}})
+    assert find_toolkits([usr_local, opt]) == [
+        CudaToolkit(str(a), "12.4.1", "version.json"),
+        CudaToolkit(str(b), "13.0.2", "version.json"),
+    ]
+
+
+def test_unrelated_directories_and_files_are_ignored(tmp_path: Path) -> None:
+    for name in ("cudnn", "cuda-samples", "lib", "cuda_backup"):
+        (tmp_path / name).mkdir()
+    (tmp_path / "cuda-11.8").write_text("a file, not a toolkit")
+    assert find_toolkits([tmp_path]) == []
+
+
+def test_missing_roots_are_not_an_error(tmp_path: Path) -> None:
+    assert find_toolkits([tmp_path / "does-not-exist"]) == []
+
+
+@pytest.mark.parametrize("content", ["{not json", "[]", '{"cuda": {"version": 12}}', ""])
+def test_unusable_version_json_leaves_the_version_unknown(tmp_path: Path, content: str) -> None:
+    directory = make_toolkit(tmp_path, "cuda-12.4")
+    (directory / "version.json").write_text(content)
+    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory))]
+
+
+def test_huge_version_files_are_read_only_partially(tmp_path: Path) -> None:
+    directory = make_toolkit(tmp_path, "cuda-12.4")
+    (directory / "version.json").write_text(
+        '{"cuda": {"version": "12.4.1"}, "pad": "' + "x" * 200_000 + '"}'
+    )
+    assert find_toolkits([tmp_path]) == [CudaToolkit(str(directory))]
