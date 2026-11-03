@@ -40,6 +40,13 @@ MAX_METADATA_BYTES = 64 * 1024
 CUDA_LIBRARIES = ("libtorch_cuda.so", "torch_cuda.dll", "libtorch_cuda.dylib")
 HIP_LIBRARIES = ("libtorch_hip.so", "torch_hip.dll")
 
+# torch/version.py lines, old and new style: "cuda = '11.3'", "cuda: Optional[str] = '12.8'",
+# "hip: Optional[str] = None". The file is read as text, never imported.
+VERSION_PY_LINE = re.compile(
+    r"^(?P<key>cuda|hip)\s*(?::[^=\n]*)?=\s*(?:'(?P<single>[^'\n]*)'|\"(?P<double>[^\"\n]*)\"|None)\s*$",
+    re.MULTILINE,
+)
+
 
 def python_facts() -> dict[str, object]:
     enable_user_site = site.ENABLE_USER_SITE
@@ -109,7 +116,29 @@ def torch_facts() -> dict[str, object] | None:
         "location": str(dist.locate_file("")),
         "requires_nvidia": sorted(set(requirements)),
         "libraries": torch_libraries(os.path.join(package, "lib")),
+        "version_py": torch_version_py(os.path.join(package, "version.py")),
     }
+
+
+def torch_version_py(path: str) -> dict[str, str | None] | None:
+    """The cuda and hip versions torch was built with, read from torch/version.py as text.
+
+    None when the file is missing or names neither (a damaged or unusual install).
+    """
+    try:
+        with open(path, "rb") as handle:
+            text = handle.read(MAX_METADATA_BYTES).decode("utf-8", "replace")
+    except OSError:
+        return None
+    found: dict[str, str | None] = {}
+    for match in VERSION_PY_LINE.finditer(text):
+        value = match.group("single")
+        if value is None:
+            value = match.group("double")
+        found.setdefault(match.group("key"), value)
+    if not found:
+        return None
+    return {"cuda": found.get("cuda"), "hip": found.get("hip")}
 
 
 def torch_libraries(lib_dir: str) -> dict[str, bool] | None:

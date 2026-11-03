@@ -9,6 +9,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from gpu_stack_inspector.runner import Outcome, SubprocessRunner
 
 SOURCE = files("gpu_stack_inspector.probes").joinpath("metadata_program.py").read_text()
@@ -197,3 +199,48 @@ def test_a_missing_lib_folder_leaves_the_libraries_unknown(tmp_path: Path) -> No
     (site / "torch" / "lib").rmdir()
     torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
     assert torch["libraries"] is None  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("version_py", "expected"),
+    [
+        (
+            "__version__ = '2.11.0+cu128'\ndebug = False\ncuda: Optional[str] = '12.8'\n"
+            "git_version = '70d99e9'\nhip: Optional[str] = None\n",
+            {"cuda": "12.8", "hip": None},
+        ),
+        (
+            "__version__ = '1.12.0'\ndebug = False\ncuda = '11.3'\nhip = None\n",
+            {"cuda": "11.3", "hip": None},
+        ),
+        (
+            "cuda: Optional[str] = None\nhip: Optional[str] = '6.2.41133'\n",
+            {"cuda": None, "hip": "6.2.41133"},
+        ),
+        ('cuda = "12.1"\n', {"cuda": "12.1", "hip": None}),
+        ("cuda = None\nhip = None\n", {"cuda": None, "hip": None}),
+        ("nothing useful\n", None),
+    ],
+    ids=["new-style", "old-style", "rocm", "double-quotes", "cpu", "unrecognised"],
+)
+def test_torch_version_py_is_read_as_text(
+    tmp_path: Path, version_py: str, expected: dict[str, str | None] | None
+) -> None:
+    path = tmp_path / "version.py"
+    path.write_text(version_py, encoding="utf-8")
+    assert program()["torch_version_py"](str(path)) == expected
+
+
+def test_a_missing_version_py_is_unknown(tmp_path: Path) -> None:
+    assert program()["torch_version_py"](str(tmp_path / "version.py")) is None
+
+
+def test_version_py_is_never_executed(tmp_path: Path) -> None:
+    site = fake_torch(tmp_path)
+    marker = tmp_path / "executed"
+    (site / "torch" / "version.py").write_text(
+        f"open({str(marker)!r}, 'w').write('ran')\ncuda = '12.8'\n", encoding="utf-8"
+    )
+    torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
+    assert torch["version_py"] == {"cuda": "12.8", "hip": None}  # type: ignore[index]
+    assert not marker.exists()
