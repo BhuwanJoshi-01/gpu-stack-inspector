@@ -1,0 +1,62 @@
+name: Bug report
+description: The tool crashed, hung, or reported something that is wrong
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never paste tokens, passwords, a full `.env` or `env` dump, or screenshots that
+        show personal data.** Reports from `gpu-stack-inspector report` are redacted by default; check them anyway
+        before posting.
+  - type: input
+    id: command
+    attributes:
+      label: Exact command
+      placeholder: gpu-stack-inspector compare --python ~/envA/bin/python --python ~/envB/bin/python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `gpu-stack-inspector --version`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Sanitized report
+      description: "`gpu-stack-inspector report --format markdown --output -` (redacted by default)"
+      render: markdown
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Did you run the runtime probe (`probe --runtime`)?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: e.g. Ubuntu 26.04, RTX 3050 Laptop, driver 595.99, conda env with torch 2.11.0+cu128
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
