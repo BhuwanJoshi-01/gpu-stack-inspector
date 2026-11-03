@@ -67,7 +67,9 @@ class Finding:
 
     ``subject`` says what the finding is about: ``host`` or the label of an inspected
     environment. ``verify_command`` is a command the user can run to check the result
-    after acting on ``recommended_action``.
+    after acting on ``recommended_action``. ``caused_by`` names the finding this one
+    follows from (``GSI-SYS-001`` for "driver not checked because nvidia-smi is missing"),
+    so reports can show one root cause instead of a cascade.
     """
 
     id: str
@@ -81,10 +83,13 @@ class Finding:
     recommended_action: str | None = None
     verify_command: str | None = None
     limitations: tuple[str, ...] = ()
+    caused_by: str | None = None
 
     def __post_init__(self) -> None:
         if not FINDING_ID.fullmatch(self.id):
             raise ValueError(f"finding id {self.id!r} does not match GSI-<AREA>-<NNN>")
+        if self.caused_by is not None and not FINDING_ID.fullmatch(self.caused_by):
+            raise ValueError(f"caused_by {self.caused_by!r} does not match GSI-<AREA>-<NNN>")
         if not self.summary.strip():
             raise ValueError(f"finding {self.id} has an empty summary")
 

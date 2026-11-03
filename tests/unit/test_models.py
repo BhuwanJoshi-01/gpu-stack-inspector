@@ -139,3 +139,10 @@ def test_torch_facts_default_to_unknown_evidence() -> None:
     assert torch.version_py_found is False
     assert torch.conda_records is None
     assert InterpreterFacts(label="A", path="/p").torch is None
+
+
+def test_a_finding_can_name_the_finding_it_follows_from() -> None:
+    assert _finding(caused_by="GSI-SYS-001").caused_by == "GSI-SYS-001"
+    assert _finding().caused_by is None
+    with pytest.raises(ValueError, match="caused_by"):
+        _finding(caused_by="nvidia-smi missing")
