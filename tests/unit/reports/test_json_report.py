@@ -3,6 +3,7 @@ import json
 from gpu_stack_inspector.models import (
     Distribution,
     FailureKind,
+    FieldComparison,
     GpuDevice,
     InterpreterFacts,
     NvidiaFacts,
@@ -93,3 +94,18 @@ def test_interpreters_include_the_torch_build_verdict() -> None:
         "evidence"
     ]
     assert second["torch_build"]["kind"] == "missing"
+
+
+def test_comparison_rows_say_whether_they_differ() -> None:
+    snapshot = Snapshot(
+        "0.1.0",
+        "t",
+        comparison=(
+            FieldComparison("torch build", ("CUDA 12.8", "CPU only")),
+            FieldComparison("platform", ("linux-x86_64", "linux-x86_64")),
+        ),
+    )
+    assert snapshot_to_dict(snapshot)["comparison"] == [
+        {"field": "torch build", "values": ["CUDA 12.8", "CPU only"], "differs": True},
+        {"field": "platform", "values": ["linux-x86_64", "linux-x86_64"], "differs": False},
+    ]
