@@ -25,7 +25,6 @@ def text(value: str, **context: Any) -> str:
 # --- home directories ---------------------------------------------------------------
 
 
-@pending
 @pytest.mark.parametrize(
     ("raw", "clean"),
     [
@@ -53,7 +52,6 @@ def test_home_directories_are_hidden(raw: str, clean: str) -> None:
     [
         ("owned by alice", "owned by <user>"),
         ("alice's environment", "<user>'s environment"),
-        ("malice and alice_env stay", "malice and alice_env stay"),
         ("connected to alice-laptop:22", "connected to <host>:22"),
     ],
 )
@@ -61,7 +59,10 @@ def test_user_and_host_names_are_hidden_as_whole_words(raw: str, clean: str) -> 
     assert text(raw) == clean
 
 
-@pending
+def test_names_inside_other_words_are_left_alone() -> None:
+    assert text("malice and alice_env stay") == "malice and alice_env stay"
+
+
 def test_short_or_generic_names_are_not_treated_as_secrets() -> None:
     assert text("al is short", user="al", home="/home/al") == "al is short"
     assert text("root cause", user="root", home="/root") == "root cause"
@@ -90,7 +91,6 @@ def test_secret_assignments_keep_the_name_and_hide_the_value(raw: str, clean: st
     assert text(raw) == clean
 
 
-@pending
 @pytest.mark.parametrize(
     "harmless",
     [
@@ -113,11 +113,14 @@ def test_ordinary_settings_are_left_alone(harmless: str) -> None:
         ("postgres://alice:S3cr3t@db.local:5432/app", "postgres://<redacted>@db.local:5432/app"),
         ("postgres://u:p@ss@db/app", "postgres://<redacted>@db/app"),
         ("https://token@github.com/org/repo", "https://<redacted>@github.com/org/repo"),
-        ("https://pypi.org/simple/torch/", "https://pypi.org/simple/torch/"),
     ],
 )
 def test_credentials_in_urls_are_hidden(raw: str, clean: str) -> None:
     assert text(raw) == clean
+
+
+def test_urls_without_credentials_are_left_alone() -> None:
+    assert text("https://pypi.org/simple/torch/") == "https://pypi.org/simple/torch/"
 
 
 @pending
@@ -143,12 +146,10 @@ def test_bearer_tokens_are_hidden() -> None:
     assert text("Authorization: Bearer abc.def.ghi123") == "Authorization: Bearer <redacted-token>"
 
 
-@pending
 def test_control_characters_are_stripped_while_redacting() -> None:
     assert text("\x1b[31m/home/alice/x\x1b[0m") == "~/x"
 
 
-@pending
 def test_redaction_is_idempotent() -> None:
     raw = "alice at /home/alice and /home/bob, HF_TOKEN=hf_" + "z" * 34
     once = text(raw)
@@ -218,7 +219,6 @@ def test_summary_counts_what_was_redacted() -> None:
     assert r.summary == {"home_path": 2, "secret_value": 1, "url_credentials": 1, "user_name": 1}
 
 
-@pending
 def test_context_for_the_current_user_tolerates_missing_information(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
