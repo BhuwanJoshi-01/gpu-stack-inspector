@@ -117,7 +117,26 @@ def torch_facts() -> dict[str, object] | None:
         "requires_nvidia": sorted(set(requirements)),
         "libraries": torch_libraries(os.path.join(package, "lib")),
         "version_py": torch_version_py(os.path.join(package, "version.py")),
+        "conda_records": conda_records(sys.prefix),
     }
+
+
+def conda_records(prefix: str) -> list[str] | None:
+    """Conda packages that decide the torch build, by file name in conda-meta.
+
+    Names like ``pytorch-1.12.0-py3.8_cuda11.3_cudnn8.3.2_0`` carry the build string, so
+    the (multi-megabyte) records are never opened. None outside conda environments.
+    """
+    try:
+        names = os.listdir(os.path.join(prefix, "conda-meta"))
+    except OSError:
+        return None
+    wanted_prefixes = ("pytorch-", "cudatoolkit-", "cuda-version-", "cuda-runtime-")
+    return sorted(
+        name[: -len(".json")]
+        for name in names
+        if name.endswith(".json") and name.startswith(wanted_prefixes)
+    )
 
 
 def torch_version_py(path: str) -> dict[str, str | None] | None:

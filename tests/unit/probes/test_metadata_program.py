@@ -244,3 +244,25 @@ def test_version_py_is_never_executed(tmp_path: Path) -> None:
     torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
     assert torch["version_py"] == {"cuda": "12.8", "hip": None}  # type: ignore[index]
     assert not marker.exists()
+
+
+def test_conda_records_come_from_file_names_only(tmp_path: Path) -> None:
+    meta = tmp_path / "conda-meta"
+    meta.mkdir()
+    for name in (
+        "pytorch-1.12.0-py3.8_cuda11.3_cudnn8.3.2_0.json",
+        "pytorch-mutex-1.0-cuda.json",
+        "cudatoolkit-11.3.1-h2bc3f7f_2.json",
+        "numpy-1.23.5-py38h14f4228_0.json",
+        "history",
+    ):
+        (meta / name).write_text("{not even read}")
+    assert program()["conda_records"](str(tmp_path)) == [
+        "cudatoolkit-11.3.1-h2bc3f7f_2",
+        "pytorch-1.12.0-py3.8_cuda11.3_cudnn8.3.2_0",
+        "pytorch-mutex-1.0-cuda",
+    ]
+
+
+def test_outside_conda_there_are_no_conda_records(tmp_path: Path) -> None:
+    assert program()["conda_records"](str(tmp_path)) is None
