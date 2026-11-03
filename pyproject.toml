@@ -9,10 +9,13 @@ authors = [
     { name = "BhuwanJoshi-01", email = "bhuwanj779@gmail.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "rich>=15.0.0",
+    "typer>=0.27.3",
+]
 
 [project.scripts]
-gpu-stack-inspector = "gpu_stack_inspector:main"
+gpu-stack-inspector = "gpu_stack_inspector.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
