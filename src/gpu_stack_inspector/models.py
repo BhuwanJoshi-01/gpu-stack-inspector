@@ -273,6 +273,34 @@ class TorchFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeStep:
+    """One step of the runtime probe: import torch, cuda available, devices, tensor operation."""
+
+    step: str
+    ok: bool
+    seconds: float | None = None
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeFacts:
+    """What happened when torch was imported and CUDA used (only with --runtime).
+
+    ``failure`` is set when the interpreter itself crashed, hung or printed no result; the
+    steps then end with the one it was in.
+    """
+
+    torch_version: str | None = None
+    cuda_version: str | None = None
+    """torch.version.cuda at runtime: the CUDA version the build targets."""
+    cuda_available: bool | None = None
+    devices: tuple[GpuDevice, ...] = ()
+    tensor_ok: bool | None = None
+    steps: tuple[RuntimeStep, ...] = ()
+    failure: ProbeFailure | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class InterpreterFacts:
     """What one target Python interpreter reported about itself.
 
@@ -294,6 +322,8 @@ class InterpreterFacts:
     pythonpath_set: bool | None = None
     distributions: tuple[Distribution, ...] = ()
     torch: TorchFacts | None = None
+    runtime: RuntimeFacts | None = None
+    """None unless the runtime probe was run (``probe --runtime``)."""
     failures: tuple[ProbeFailure, ...] = ()
 
     @property

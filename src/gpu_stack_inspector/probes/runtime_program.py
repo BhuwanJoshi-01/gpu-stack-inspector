@@ -19,6 +19,9 @@ from typing import Any, Callable
 PROTOCOL = 1
 BEGIN = "GSI-RUNTIME-BEGIN"
 END = "GSI-RUNTIME-END"
+STEP = "GSI-RUNTIME-STEP"
+"""Printed (and flushed) before each step: if CUDA initialisation kills the interpreter,
+no JSON is printed, and the last marker says which step it died in."""
 ELEMENTS = 16
 
 
@@ -34,6 +37,8 @@ def run_steps() -> dict[str, object]:
     state: dict[str, Any] = {}
 
     def step(name: str, action: Callable[[], object]) -> bool:
+        sys.stdout.write("%s %s\n" % (STEP, name))
+        sys.stdout.flush()
         started = time.monotonic()
         try:
             value = action()

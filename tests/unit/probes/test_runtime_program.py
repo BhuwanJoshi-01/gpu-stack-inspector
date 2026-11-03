@@ -101,3 +101,19 @@ def test_nothing_is_written_next_to_the_probe(tmp_path: Path) -> None:
         env_overrides={"PYTHONPATH": str(fake)},
     )
     assert list(tmp_path.iterdir()) == []
+
+
+def test_each_step_is_announced_before_it_starts() -> None:
+    fake = FIXTURES / "fake-torch" / "working"
+    result = SubprocessRunner().run(
+        [sys.executable, "-c", SOURCE], timeout=30, env_overrides={"PYTHONPATH": str(fake)}
+    )
+    announced = [
+        line.split(" ", 1)[1]
+        for line in result.stdout.splitlines()
+        if line.startswith("GSI-RUNTIME-STEP ")
+    ]
+    assert announced == ["import torch", "cuda available", "devices", "tensor operation"]
+    assert result.stdout.index("GSI-RUNTIME-STEP tensor operation") < result.stdout.index(
+        "GSI-RUNTIME-BEGIN"
+    )

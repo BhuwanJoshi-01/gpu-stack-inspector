@@ -130,3 +130,53 @@ def test_with_comparison_compares_the_inspected_interpreters() -> None:
     compared = with_comparison(snapshot)
     python_row = next(row for row in compared.comparison if row.field == "Python")
     assert python_row.values == ("3.12.0", "3.13.0")
+
+
+def _script_metadata(runner: FakeRunner, python: Path, torch: bool) -> None:
+    document = {
+        "protocol": 1,
+        "errors": [],
+        "python": {"version": "3.12.13"},
+        "distributions": [],
+        "torch": {"version": "2.11.0+cu128"} if torch else None,
+    }
+    runner.script(
+        str(python),
+        "-c",
+        program_source(),
+        stdout=f"GSI-PROBE-BEGIN{json.dumps(document)}GSI-PROBE-END",
+    )
+
+
+def _interpreter(tmp_path: Path, name: str) -> Path:
+    python = tmp_path / name / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text("#!/bin/sh\n")
+    python.chmod(0o755)
+    return python
+
+
+def test_the_runtime_probe_runs_only_with_consent_and_only_where_torch_is(tmp_path: Path) -> None:
+    from gpu_stack_inspector.probes import runtime_probe
+
+    with_torch, without_torch = _interpreter(tmp_path, "a"), _interpreter(tmp_path, "b")
+    runner = FakeRunner()
+    _script_metadata(runner, with_torch, torch=True)
+    _script_metadata(runner, without_torch, torch=False)
+    runner.script(
+        str(with_torch),
+        "-c",
+        runtime_probe.program_source(),
+        stdout=read_fixture("runtime", "sapiens2.stdout.txt"),
+    )
+    kwargs = {"which": lambda _: None, "environ": {}, "toolkit_roots": (), "host": lambda: HOST}
+
+    plain = inspect(runner, [str(with_torch), str(without_torch)], **kwargs)  # type: ignore[arg-type]
+    assert [i.runtime for i in plain.interpreters] == [None, None]
+    assert not any(runtime_probe.program_source() in call.argv for call in runner.calls)
+
+    probed = inspect(runner, [str(with_torch), str(without_torch)], runtime=True, **kwargs)  # type: ignore[arg-type]
+    first, second = probed.interpreters
+    assert first.runtime is not None
+    assert first.runtime.tensor_ok is True
+    assert second.runtime is None

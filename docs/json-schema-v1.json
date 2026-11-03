@@ -498,7 +498,8 @@
         "torch",
         "failures",
         "virtualenv",
-        "torch_build"
+        "torch_build",
+        "runtime"
       ],
       "properties": {
         "label": {
@@ -591,6 +592,16 @@
         },
         "torch_build": {
           "$ref": "#/$defs/torch_build"
+        },
+        "runtime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/runtime"
+            }
+          ]
         }
       }
     },
@@ -730,6 +741,97 @@
         "count": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "runtime_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "ok",
+        "seconds",
+        "error"
+      ],
+      "properties": {
+        "step": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "seconds": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "torch_version",
+        "cuda_version",
+        "cuda_available",
+        "devices",
+        "tensor_ok",
+        "steps",
+        "failure"
+      ],
+      "properties": {
+        "torch_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cuda_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cuda_available": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gpu"
+          }
+        },
+        "tensor_ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runtime_step"
+          }
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/probe_failure"
+            }
+          ]
         }
       }
     }

@@ -22,6 +22,7 @@ from gpu_stack_inspector.models import (
     utc_timestamp,
 )
 from gpu_stack_inspector.probes.metadata_probe import probe_interpreter
+from gpu_stack_inspector.probes.runtime_probe import run_runtime_probe
 from gpu_stack_inspector.rules.catalog import builtin_rules
 from gpu_stack_inspector.rules.comparison import compare_interpreters
 from gpu_stack_inspector.rules.engine import RuleContext, evaluate
@@ -59,11 +60,14 @@ def inspect(
     environ: Mapping[str, str] = os.environ,
     toolkit_roots: Sequence[Path] = DEFAULT_ROOTS,
     host: Callable[[], HostFacts] = collect_host,
+    runtime: bool = False,
 ) -> Snapshot:
     """Inspect the machine and each named interpreter, labelled A, B, C… in order.
 
     Interpreter failures are added to the snapshot's list tagged with their label, so a
-    report can say which environment could not be checked.
+    report can say which environment could not be checked. With ``runtime`` (the user's
+    explicit consent), torch is also imported and CUDA used once in every interpreter
+    that started and has torch installed.
     """
     snapshot = inspect_host(
         runner, which=which, environ=environ, toolkit_roots=toolkit_roots, host=host
@@ -72,6 +76,13 @@ def inspect(
         probe_interpreter(runner, interpreter_label(index), raw, cwd=cwd)
         for index, raw in enumerate(pythons)
     )
+    if runtime:
+        interpreters = tuple(
+            replace(i, runtime=run_runtime_probe(runner, i.path))
+            if i.version is not None and i.torch is not None
+            else i
+            for i in interpreters
+        )
     return replace(
         snapshot,
         interpreters=interpreters,
@@ -85,11 +96,17 @@ def interpreter_label(index: int) -> str:
 
 
 def _tagged_failures(interpreters: Sequence[InterpreterFacts]) -> list[ProbeFailure]:
-    return [
+    failures = [
         replace(failure, probe=f"{failure.probe} {facts.label}")
         for facts in interpreters
         for failure in facts.failures
     ]
+    failures += [
+        replace(facts.runtime.failure, probe=f"{facts.runtime.failure.probe} {facts.label}")
+        for facts in interpreters
+        if facts.runtime is not None and facts.runtime.failure is not None
+    ]
+    return failures
 
 
 def default_interpreters(which: Callable[[str], str | None] = shutil.which) -> list[str]:
