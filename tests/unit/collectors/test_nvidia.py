@@ -10,8 +10,6 @@ from gpu_stack_inspector.models import FailureKind, GpuDevice
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner, UnexpectedCommandError, read_fixture
 
-pending = pytest.mark.xfail(strict=True, reason="GPU-002: nvidia-smi collector pending")
-
 SMI = "/usr/bin/nvidia-smi"
 FIELDS = "index,name,driver_version,memory.total,compute_cap"
 QUERY = (SMI, f"--query-gpu={FIELDS}", "--format=csv,noheader,nounits")
@@ -132,7 +130,6 @@ def test_old_driver_without_compute_cap_is_queried_again_without_it() -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_driver_without_version_flag_falls_back_to_the_table_header() -> None:
     runner = scripted()
     runner.script(*VERSION, stdout="Invalid combination of input arguments.\n", returncode=2)
@@ -150,6 +147,9 @@ def test_unknown_max_cuda_version_is_left_unknown_when_both_sources_fail() -> No
     facts = collect(runner)
     assert facts.max_cuda_version is None
     assert facts.gpus  # the GPU list is still reported
+    assert [f.detail for f in facts.failures] == [
+        "nvidia-smi did not report the driver's maximum CUDA version"
+    ]
 
 
 def test_malformed_rows_are_skipped_and_reported() -> None:

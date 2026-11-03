@@ -20,6 +20,9 @@ _UNAVAILABLE = frozenset(
     {"", "n/a", "[n/a]", "not supported", "[not supported]", "[unknown error]"}
 )
 _COMPUTE_CAPABILITY = re.compile(r"[0-9]+\.[0-9]+")
+_TABLE_HEADER = re.compile(
+    r"Driver Version:\s*(?P<driver>[0-9][0-9.]*)\s+CUDA Version:\s*(?P<cuda>[0-9][0-9.]*)"
+)
 _VERSION_LINE = re.compile(r"^\s*(?P<key>[A-Za-z -]+?)\s*:\s*(?P<value>\S+)\s*$", re.MULTILINE)
 
 
@@ -58,6 +61,8 @@ def collect_nvidia(
 
     gpus, driver_version, failures = _parse_query(result.stdout, fields)
     versions = _versions(runner, smi, timeout)
+    if "cuda version" not in versions:
+        failures.append(_malformed("nvidia-smi did not report the driver's maximum CUDA version"))
     return NvidiaFacts(
         smi_path=smi,
         driver_version=driver_version or versions.get("driver version"),
@@ -73,12 +78,19 @@ def _versions(runner: CommandRunner, smi: str, timeout: float) -> dict[str, str]
     Its output looks like ``CUDA Version        : 13.2``.
     """
     result = runner.run([smi, "--version"], timeout=timeout, env_overrides=_ENV)
-    if not result.ok:
+    if result.ok:
+        return {
+            match["key"].strip().lower(): match["value"]
+            for match in _VERSION_LINE.finditer(result.stdout)
+        }
+    # Older drivers have no --version; the classic table's header has both values:
+    # "| NVIDIA-SMI 470.256.02   Driver Version: 470.256.02   CUDA Version: 11.4 |".
+    # Only the header is read; the process list further down is never parsed or kept.
+    table = runner.run([smi], timeout=timeout, env_overrides=_ENV)
+    header = _TABLE_HEADER.search(table.stdout) if table.ok else None
+    if header is None:
         return {}
-    return {
-        match["key"].strip().lower(): match["value"]
-        for match in _VERSION_LINE.finditer(result.stdout)
-    }
+    return {"driver version": header["driver"], "cuda version": header["cuda"]}
 
 
 def _rejects_field(result: CommandResult, field: str) -> bool:
