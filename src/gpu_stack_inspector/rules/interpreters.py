@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 
 from gpu_stack_inspector.models import (
     Confidence,
@@ -78,4 +79,51 @@ def interpreter_usable(snapshot: Snapshot, context: RuleContext) -> Iterator[Fin
                 "environment usually has to be recreated."
             ),
             verify_command=f"{interpreter.path} --version",
+        )
+
+
+def _environment_directory(path: str) -> str:
+    # Same directory means same environment: bin/python and bin/python3 of one venv match,
+    # two venvs do not. Symlinks are not followed, they would make every venv equal to
+    # its base interpreter, which is why this is absolute() and not resolve().
+    return str(Path(path).absolute().parent)
+
+
+@RULES.rule("GSI-ENV-002", "The interpreter is the one the shell runs")
+def shell_interpreter(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether an inspected interpreter is the python the user's shell would start.
+
+    A common source of confusion: the environment that was checked (or fixed) is not the
+    one a plain `python` command runs, for example because another venv or conda env is
+    active. Interpreters count as the same when they live in the same directory.
+    """
+    if context.shell_python is None:
+        return
+    shell_directory = _environment_directory(context.shell_python)
+    for interpreter in snapshot.interpreters:
+        if not _usable(interpreter):
+            continue
+        if _environment_directory(interpreter.path) == shell_directory:
+            continue
+        yield Finding(
+            id="GSI-ENV-002",
+            status=Status.WARN,
+            severity=Severity.LOW,
+            confidence=Confidence.MEDIUM,
+            summary="This is not the python your shell runs",
+            reason=(
+                f"Your shell runs {context.shell_python}. Results for {interpreter.path} do not "
+                "apply to programs started with a plain `python` command."
+            ),
+            subject=interpreter.label,
+            evidence=(Evidence("PATH", "python", context.shell_python),),
+            recommended_action=(
+                "Activate this environment before running your program, or start it with "
+                "this interpreter's full path."
+            ),
+            verify_command="which python",
+            limitations=(
+                "Interpreters are compared by directory, so two interpreters of one "
+                "environment in different directories are reported as different.",
+            ),
         )
