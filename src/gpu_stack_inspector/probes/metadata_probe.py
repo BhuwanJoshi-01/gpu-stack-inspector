@@ -153,6 +153,21 @@ def _distributions(section: object, unexpected: list[str]) -> list[Distribution]
     return found
 
 
+def python_error_line(stderr: str) -> str:
+    """The line of a Python crash that names the problem, or "" if there is none.
+
+    The exception at the end of a traceback, else the "Fatal Python error" line, else the
+    first line of stderr.
+    """
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    reason = next((line for line in reversed(lines) if _EXCEPTION_LINE.fullmatch(line)), None)
+    if reason is None:
+        reason = next((line for line in lines if line.startswith("Fatal Python error")), None)
+    if reason is None:
+        reason = lines[0] if lines else ""
+    return reason
+
+
 def _crash(path: Path, result: CommandResult) -> ProbeFailure:
     """Explain a crashed interpreter by the line that names the problem.
 
@@ -160,12 +175,7 @@ def _crash(path: Path, result: CommandResult) -> ProbeFailure:
     the exception is on its last line. "Fatal Python error" output (a broken standard
     library, for instance) names the underlying exception further down.
     """
-    lines = [line.strip() for line in result.stderr.splitlines() if line.strip()]
-    reason = next((line for line in reversed(lines) if _EXCEPTION_LINE.fullmatch(line)), None)
-    if reason is None:
-        reason = next((line for line in lines if line.startswith("Fatal Python error")), None)
-    if reason is None:
-        reason = lines[0] if lines else ""
+    reason = python_error_line(result.stderr)
     detail = f"{path} exited with code {result.returncode}"
     if reason:
         detail += f": {reason}"
