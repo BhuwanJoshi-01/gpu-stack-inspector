@@ -96,9 +96,12 @@ def shell_interpreter(snapshot: Snapshot, context: RuleContext) -> Iterator[Find
 
     A common source of confusion: the environment that was checked (or fixed) is not the
     one a plain `python` command runs, for example because another venv or conda env is
-    active. Interpreters count as the same when they live in the same directory.
+    active. Only checked when a single interpreter is inspected: naming several means
+    other environments are being compared on purpose. Interpreters count as the same when
+    they live in the same directory (symlinks are not followed), so two interpreters of
+    one environment in different directories are reported as different.
     """
-    if context.shell_python is None:
+    if context.shell_python is None or len(snapshot.interpreters) != 1:
         return
     shell_directory = _environment_directory(context.shell_python)
     for interpreter in snapshot.interpreters:
@@ -123,10 +126,6 @@ def shell_interpreter(snapshot: Snapshot, context: RuleContext) -> Iterator[Find
                 "this interpreter's full path."
             ),
             verify_command="which python",
-            limitations=(
-                "Interpreters are compared by directory, so two interpreters of one "
-                "environment in different directories are reported as different.",
-            ),
         )
 
 
