@@ -36,6 +36,10 @@ EXACT = frozenset(
 PREFIXES = ("nvidia-", "cupy-cuda", "jax-cuda", "tensorrt-")
 MAX_METADATA_BYTES = 64 * 1024
 
+# Libraries in torch/lib that only GPU builds ship (Linux, Windows, macOS names).
+CUDA_LIBRARIES = ("libtorch_cuda.so", "torch_cuda.dll", "libtorch_cuda.dylib")
+HIP_LIBRARIES = ("libtorch_hip.so", "torch_hip.dll")
+
 
 def python_facts() -> dict[str, object]:
     enable_user_site = site.ENABLE_USER_SITE
@@ -99,10 +103,24 @@ def torch_facts() -> dict[str, object] | None:
         match = re.match(r"[A-Za-z0-9._-]+", requirement)
         if match and normalize(match.group(0)).startswith("nvidia-"):
             requirements.append(normalize(match.group(0)))
+    package = str(dist.locate_file("torch"))
     return {
         "version": dist.version,
         "location": str(dist.locate_file("")),
         "requires_nvidia": sorted(set(requirements)),
+        "libraries": torch_libraries(os.path.join(package, "lib")),
+    }
+
+
+def torch_libraries(lib_dir: str) -> dict[str, bool] | None:
+    """Whether torch/lib holds CUDA or ROCm libraries; None if the folder cannot be read."""
+    try:
+        names = set(os.listdir(lib_dir))
+    except OSError:
+        return None
+    return {
+        "cuda": any(name in names for name in CUDA_LIBRARIES),
+        "hip": any(name in names for name in HIP_LIBRARIES),
     }
 
 

@@ -175,3 +175,25 @@ def test_torch_version_location_and_nvidia_requirements_are_reported(tmp_path: P
     assert torch["version"] == "2.11.0+cu128"
     assert Path(torch["location"]) == site
     assert torch["requires_nvidia"] == ["nvidia-cuda-runtime-cu12", "nvidia-cudnn-cu12"]
+
+
+def test_cuda_libraries_in_torch_lib_are_noticed(tmp_path: Path) -> None:
+    site = fake_torch(tmp_path)
+    (site / "torch" / "lib" / "libtorch_cuda.so").write_bytes(b"")
+    (site / "torch" / "lib" / "libtorch_cpu.so").write_bytes(b"")
+    torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
+    assert torch["libraries"] == {"cuda": True, "hip": False}  # type: ignore[index]
+
+
+def test_a_cpu_build_has_no_gpu_libraries(tmp_path: Path) -> None:
+    site = fake_torch(tmp_path)
+    (site / "torch" / "lib" / "libtorch_cpu.so").write_bytes(b"")
+    torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
+    assert torch["libraries"] == {"cuda": False, "hip": False}  # type: ignore[index]
+
+
+def test_a_missing_lib_folder_leaves_the_libraries_unknown(tmp_path: Path) -> None:
+    site = fake_torch(tmp_path)
+    (site / "torch" / "lib").rmdir()
+    torch = run_probe(env_overrides={"PYTHONPATH": str(site)})["torch"]
+    assert torch["libraries"] is None  # type: ignore[index]
