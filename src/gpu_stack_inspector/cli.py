@@ -68,7 +68,10 @@ def inspect(
             "--python",
             "-p",
             metavar="PATH",
-            help="Python interpreter to inspect. Repeat it to inspect several.",
+            help=(
+                "Python interpreter to inspect. Repeat it to inspect several. "
+                "Default: the python on PATH."
+            ),
         ),
     ] = None,
     output_format: Annotated[
@@ -80,7 +83,8 @@ def inspect(
     Interpreters are inspected from their metadata only; nothing is imported into
     them beyond the standard library.
     """
-    snapshot = orchestrator.inspect(SubprocessRunner(), python or [])
+    pythons = python or orchestrator.default_interpreters()
+    snapshot = orchestrator.inspect(SubprocessRunner(), pythons)
     redacted = Redactor(RedactionContext.current()).redact(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)

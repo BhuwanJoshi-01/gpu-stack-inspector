@@ -3,7 +3,12 @@ from pathlib import Path
 
 from gpu_stack_inspector import __version__
 from gpu_stack_inspector.models import EnvironmentVariable, FailureKind, HostFacts
-from gpu_stack_inspector.orchestrator import inspect, inspect_host, interpreter_label
+from gpu_stack_inspector.orchestrator import (
+    default_interpreters,
+    inspect,
+    inspect_host,
+    interpreter_label,
+)
 from gpu_stack_inspector.probes.metadata_probe import program_source
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner, read_fixture
@@ -88,3 +93,10 @@ def test_without_interpreters_only_the_host_is_inspected() -> None:
 
 def test_labels_run_from_a_to_z_and_then_number() -> None:
     assert [interpreter_label(i) for i in (0, 1, 25, 26)] == ["A", "B", "Z", "#27"]
+
+
+def test_the_default_interpreter_is_the_python_on_path() -> None:
+    found = {"python": "/envs/a/bin/python", "python3": "/usr/bin/python3"}
+    assert default_interpreters(found.get) == ["/envs/a/bin/python"]
+    assert default_interpreters({"python3": "/usr/bin/python3"}.get) == ["/usr/bin/python3"]
+    assert default_interpreters(lambda _: None) == []

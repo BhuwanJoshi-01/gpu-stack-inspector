@@ -94,3 +94,11 @@ def test_inspect_is_listed_in_the_help(
 ) -> None:
     assert run_main(monkeypatch, "--help") == 0
     assert "inspect" in strip_control(capsys.readouterr().out)
+
+
+def test_without_python_the_python_on_path_is_inspected(
+    monkeypatch: pytest.MonkeyPatch, requested: list[Any]
+) -> None:
+    monkeypatch.setattr(orchestrator, "default_interpreters", lambda: ["/usr/bin/python3"])
+    assert run_main(monkeypatch, "inspect", "--format", "json") == 0
+    assert requested == [["/usr/bin/python3"]]
