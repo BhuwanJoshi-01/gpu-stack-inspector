@@ -7,13 +7,18 @@ from __future__ import annotations
 
 import os
 import sys
+from enum import StrEnum
 from typing import Annotated
 
 import typer
+from rich.console import Console
 
-from gpu_stack_inspector import __version__
+from gpu_stack_inspector import __version__, orchestrator
 from gpu_stack_inspector.exit_codes import ExitCode
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
+from gpu_stack_inspector.reports.json_report import render_json
+from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.runner import SubprocessRunner
 
 HELP = (
     "Explain why PyTorch can use the GPU in one Python environment but not another.\n\n"
@@ -48,6 +53,39 @@ def cli(
     ] = False,
 ) -> None:
     """Global options (the help text comes from HELP)."""
+
+
+class OutputFormat(StrEnum):
+    TEXT = "text"
+    JSON = "json"
+
+
+@app.command()
+def inspect(
+    python: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help="Python interpreter to inspect. Repeat it to inspect several.",
+        ),
+    ] = None,
+    output_format: Annotated[
+        OutputFormat, typer.Option("--format", "-f", help="Output format.")
+    ] = OutputFormat.TEXT,
+) -> None:
+    """Inspect this machine and Python interpreters, read-only.
+
+    Interpreters are inspected from their metadata only; nothing is imported into
+    them beyond the standard library.
+    """
+    snapshot = orchestrator.inspect(SubprocessRunner(), python or [])
+    redacted = Redactor(RedactionContext.current()).redact(snapshot)
+    if output_format is OutputFormat.JSON:
+        typer.echo(render_json(redacted), nl=False)
+    else:
+        render_terminal(redacted, Console())
 
 
 def main() -> None:
