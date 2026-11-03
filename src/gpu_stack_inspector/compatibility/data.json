@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "retrieved": "2026-11-03",
+  "sources": {
+    "nvidia-cuda-compatibility": {
+      "title": "NVIDIA: CUDA Compatibility",
+      "url": "https://docs.nvidia.com/deploy/cuda-compatibility/latest/"
+    },
+    "nvidia-minor-version-compatibility": {
+      "title": "NVIDIA: CUDA Compatibility, Minor Version Compatibility",
+      "url": "https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html"
+    }
+  },
+  "minor_version_compatibility": {
+    "from_cuda_major": 11,
+    "source": "nvidia-minor-version-compatibility",
+    "note": "Applications built within a CUDA major release family run on a driver of that family's minimum or newer, with a limited feature set; code compiled to PTX does not work on older drivers."
+  },
+  "minimum_driver": [
+    {"cuda_major": 11, "driver": "450", "source": "nvidia-minor-version-compatibility"},
+    {"cuda_major": 12, "driver": "525", "source": "nvidia-minor-version-compatibility"},
+    {"cuda_major": 13, "driver": "580", "source": "nvidia-minor-version-compatibility"}
+  ]
+}
