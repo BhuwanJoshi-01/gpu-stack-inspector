@@ -118,3 +118,58 @@ def driver_answers(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding
         ),
         limitations=tuple(f.detail for f in nvidia.failures),
     )
+
+
+@RULES.rule("GSI-SYS-003", "The driver sees a GPU")
+def gpu_visible(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether the NVIDIA driver lists at least one GPU.
+
+    A driver that answers but lists no GPU means the GPU is switched off or not handed to
+    this system: a hybrid-graphics mode that powers the NVIDIA GPU down, a BIOS setting,
+    or a VM or container the GPU was not passed through to.
+    """
+    nvidia = snapshot.nvidia
+    if nvidia is None:
+        return
+    if nvidia.smi_path is None or nvidia.driver_version is None:
+        cause = "GSI-SYS-001" if nvidia.smi_path is None else "GSI-SYS-002"
+        yield Finding(
+            id="GSI-SYS-003",
+            status=Status.NOT_TESTED,
+            severity=Severity.INFO,
+            confidence=Confidence.HIGH,
+            summary="GPUs were not listed",
+            reason="The driver could not be asked.",
+            caused_by=cause,
+        )
+        return
+    if not nvidia.gpus:
+        yield Finding(
+            id="GSI-SYS-003",
+            status=Status.FAIL if context.cuda_expected else Status.NOT_APPLICABLE,
+            severity=Severity.HIGH if context.cuda_expected else Severity.INFO,
+            confidence=Confidence.HIGH,
+            summary="The NVIDIA driver answers but sees no GPU",
+            reason=f"Driver {nvidia.driver_version} reported no devices.",
+            evidence=(Evidence(SMI, "gpus", "0"),),
+            recommended_action=(
+                "Make sure the NVIDIA GPU is switched on for this system: the hybrid-graphics "
+                "mode (for example prime-select or supergfxctl), the BIOS setting, or the "
+                "GPU passthrough of your VM or container."
+            ),
+            verify_command="nvidia-smi -L",
+        )
+        return
+    names = ", ".join(
+        f"{gpu.name} (compute {gpu.compute_capability or 'unknown'})" for gpu in nvidia.gpus
+    )
+    count = len(nvidia.gpus)
+    yield Finding(
+        id="GSI-SYS-003",
+        status=Status.PASS,
+        severity=Severity.INFO,
+        confidence=Confidence.HIGH,
+        summary=f"{count} GPU{'s' if count != 1 else ''} visible to the driver",
+        reason=names,
+        evidence=tuple(Evidence(SMI, f"gpu{gpu.index}", gpu.name) for gpu in nvidia.gpus),
+    )

@@ -96,3 +96,32 @@ def test_partial_problems_with_a_working_driver_become_limitations() -> None:
     assert result.status is Status.PASS
     assert "an unknown version" in result.reason
     assert result.limitations == ("no maximum CUDA version",)
+
+
+def test_a_visible_gpu_passes_with_its_name_and_compute_capability() -> None:
+    result = findings(snapshot(nvidia=WORKING))["GSI-SYS-003"]
+    assert result.status is Status.PASS
+    assert result.summary == "1 GPU visible to the driver"
+    assert result.reason == "NVIDIA GeForce RTX 3050 Laptop GPU (compute 8.6)"
+
+
+def test_no_gpu_with_a_working_driver_fails() -> None:
+    no_gpu = NvidiaFacts("/usr/bin/nvidia-smi", "595.99.02", "13.2")
+    result = findings(snapshot(nvidia=no_gpu))["GSI-SYS-003"]
+    assert result.status is Status.FAIL
+    assert result.verify_command == "nvidia-smi -L"
+
+
+def test_gpus_are_not_tested_when_the_driver_could_not_be_asked() -> None:
+    assert findings(snapshot(nvidia=NvidiaFacts(None)))["GSI-SYS-003"].caused_by == "GSI-SYS-001"
+    dead = NvidiaFacts("/usr/bin/nvidia-smi")
+    assert findings(snapshot(nvidia=dead))["GSI-SYS-003"].caused_by == "GSI-SYS-002"
+
+
+def test_one_missing_tool_gives_one_warning_and_two_consequences() -> None:
+    result = findings(snapshot(nvidia=NvidiaFacts(None)))
+    assert [(f.id, f.status, f.caused_by) for f in result.values()] == [
+        ("GSI-SYS-001", Status.WARN, None),
+        ("GSI-SYS-002", Status.NOT_TESTED, "GSI-SYS-001"),
+        ("GSI-SYS-003", Status.NOT_TESTED, "GSI-SYS-001"),
+    ]
