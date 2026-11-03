@@ -121,3 +121,11 @@ def test_cpu_builds_are_not_compared() -> None:
         interpreters=(interpreter,),
     )
     assert results(snapshot, "GSI-CUDA-003") == []
+
+
+def test_a_driver_that_hides_its_cuda_version_makes_both_comparisons_unknown() -> None:
+    torch_result = torch_against("12.8", None)
+    assert (torch_result.status, torch_result.caused_by) == (Status.UNKNOWN, None)
+    assert "did not report" in torch_result.reason
+    nvcc_result = nvcc_against("12.4.131", None)
+    assert nvcc_result.status is Status.UNKNOWN

@@ -46,6 +46,33 @@ def _driver_cause(snapshot: Snapshot) -> str | None:
     return None
 
 
+def _not_compared(snapshot: Snapshot, rule_id: str, what: str, subject: str = "host") -> Finding:
+    """No driver CUDA version: not tested because of a host finding, or plainly unknown."""
+    cause = _driver_cause(snapshot)
+    if cause is not None:
+        return Finding(
+            id=rule_id,
+            status=Status.NOT_TESTED,
+            severity=Severity.INFO,
+            confidence=Confidence.HIGH,
+            summary=f"{what} was not compared with the driver",
+            reason="The driver's CUDA version is not known.",
+            subject=subject,
+            caused_by=cause,
+        )
+    return Finding(
+        id=rule_id,
+        status=Status.UNKNOWN,
+        severity=Severity.LOW,
+        confidence=Confidence.LOW,
+        summary=f"{what} could not be compared with the driver",
+        reason="The driver answered but did not report the newest CUDA version it supports.",
+        subject=subject,
+        recommended_action="Check the 'CUDA Version' in the header of `nvidia-smi` by hand.",
+        verify_command="nvidia-smi",
+    )
+
+
 def _minimum_driver_sentence(major: int) -> str:
     row = load().minimum_driver.get(major)
     return f" CUDA {major}.x needs driver {row[0]} or newer." if row else ""
@@ -101,17 +128,8 @@ def nvcc_supported(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding
         return
     driver_max = major_minor(nvidia.max_cuda_version) if nvidia else None
     if driver_max is None:
-        cause = _driver_cause(snapshot)
-        if cause is not None:
-            yield Finding(
-                id="GSI-CUDA-002",
-                status=Status.NOT_TESTED,
-                severity=Severity.INFO,
-                confidence=Confidence.HIGH,
-                summary="nvcc was not compared with the driver",
-                reason="The driver's CUDA version is not known.",
-                caused_by=cause,
-            )
+        if nvidia is not None:
+            yield _not_compared(snapshot, "GSI-CUDA-002", "nvcc")
         return
     version = toolkit.nvcc_version if toolkit else None
     driver_text = nvidia.max_cuda_version if nvidia else None
@@ -178,18 +196,9 @@ def torch_cuda_supported(snapshot: Snapshot, context: RuleContext) -> Iterator[F
         if build.kind is not TorchBuildKind.CUDA or target is None:
             continue
         if driver_max is None:
-            cause = _driver_cause(snapshot)
-            if cause is not None:
-                yield Finding(
-                    id="GSI-CUDA-003",
-                    status=Status.NOT_TESTED,
-                    severity=Severity.INFO,
-                    confidence=Confidence.HIGH,
-                    summary=f"CUDA {build.cuda_version} was not compared with the driver",
-                    reason="The driver's CUDA version is not known.",
-                    subject=interpreter.label,
-                    caused_by=cause,
-                )
+            if nvidia is not None:
+                what = f"CUDA {build.cuda_version}"
+                yield _not_compared(snapshot, "GSI-CUDA-003", what, interpreter.label)
             continue
         evidence = (
             Evidence("torch", "cuda_version", build.cuda_version),
