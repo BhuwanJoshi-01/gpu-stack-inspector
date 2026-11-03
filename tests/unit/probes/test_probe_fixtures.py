@@ -64,3 +64,33 @@ def test_gpu_wheels_can_come_from_onnxruntime_instead_of_torch() -> None:
     assert "torch" not in versions(facts)
     assert "onnxruntime-gpu" in versions(facts)
     assert nvidia_wheels(facts) == 7
+
+
+def test_torch_evidence_of_a_pytorch_index_cuda_wheel() -> None:
+    torch = parse("sapiens2").torch
+    assert torch is not None
+    assert (torch.version, torch.built_cuda, torch.cuda_library) == ("2.11.0+cu128", "12.8", True)
+    assert "nvidia-cudnn-cu12" in torch.requires_nvidia
+    assert torch.conda_records == ()  # a conda env, but torch came from pip
+
+
+def test_torch_evidence_of_an_untagged_pypi_cuda_wheel() -> None:
+    torch = parse("wilor").torch
+    assert torch is not None
+    assert (torch.version, torch.built_cuda, torch.cuda_library) == ("2.14.1", "13.0", True)
+    assert "nvidia-cudnn-cu13" in torch.requires_nvidia
+
+
+def test_torch_evidence_of_a_conda_cuda_build() -> None:
+    torch = parse("smplerx").torch
+    assert torch is not None
+    assert (torch.version, torch.built_cuda, torch.cuda_library) == ("1.12.0", "11.3", True)
+    assert torch.requires_nvidia == ()
+    assert torch.conda_records is not None
+    assert "pytorch-1.12.0-py3.8_cuda11.3_cudnn8.3.2_0" in torch.conda_records
+    assert "pytorch-mutex-1.0-cuda" in torch.conda_records
+
+
+@pytest.mark.parametrize("env", ["base", "dwpose"])
+def test_environments_without_torch_have_no_torch_evidence(env: str) -> None:
+    assert parse(env).torch is None

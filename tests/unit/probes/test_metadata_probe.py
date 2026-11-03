@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from gpu_stack_inspector.models import Distribution, FailureKind
+from gpu_stack_inspector.models import Distribution, FailureKind, TorchFacts
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner
 
@@ -33,6 +33,14 @@ GOOD = {
             "location": "/envs/a/lib/site-packages",
         },
     ],
+    "torch": {
+        "version": "2.11.0+cu128",
+        "location": "/envs/a/lib/site-packages",
+        "requires_nvidia": ["nvidia-cudnn-cu12", "nvidia-nccl-cu12"],
+        "libraries": {"cuda": True, "hip": False},
+        "version_py": {"cuda": "12.8", "hip": None},
+        "conda_records": None,
+    },
 }
 
 
@@ -204,3 +212,46 @@ def test_a_hung_interpreter_is_a_timeout(tmp_path: Path) -> None:
 def test_a_crash_without_stderr_still_reports_the_exit_code(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, returncode=139)
     assert facts.failures[0].detail.endswith("exited with code 139")
+
+
+def test_the_torch_evidence_is_read(tmp_path: Path) -> None:
+    facts, _ = run(tmp_path, stdout=wrapped(GOOD))
+    assert facts.torch == TorchFacts(
+        version="2.11.0+cu128",
+        location="/envs/a/lib/site-packages",
+        requires_nvidia=("nvidia-cudnn-cu12", "nvidia-nccl-cu12"),
+        cuda_library=True,
+        hip_library=False,
+        version_py_found=True,
+        built_cuda="12.8",
+        built_hip=None,
+        conda_records=None,
+    )
+
+
+def test_without_torch_there_is_no_torch_evidence(tmp_path: Path) -> None:
+    facts, _ = run(tmp_path, stdout=wrapped({**GOOD, "torch": None}))
+    assert facts.torch is None
+    assert facts.failures == ()
+
+
+def test_torch_evidence_of_the_wrong_type_becomes_unknown(tmp_path: Path) -> None:
+    document = json.loads(json.dumps(GOOD))
+    document["torch"]["libraries"] = {"cuda": "yes", "hip": False}
+    document["torch"]["requires_nvidia"] = "nvidia-cudnn-cu12"
+    document["torch"]["version_py"] = None
+    facts, _ = run(tmp_path, stdout=wrapped(document))
+    assert facts.torch is not None
+    assert facts.torch.cuda_library is None
+    assert facts.torch.hip_library is False
+    assert facts.torch.requires_nvidia == ()
+    assert facts.torch.version_py_found is False
+    detail = facts.failures[0].detail
+    assert "torch.libraries.cuda" in detail
+    assert "torch.requires_nvidia" in detail
+
+
+def test_a_torch_section_without_a_version_is_ignored(tmp_path: Path) -> None:
+    facts, _ = run(tmp_path, stdout=wrapped({**GOOD, "torch": {"location": "/x"}}))
+    assert facts.torch is None
+    assert "torch" in facts.failures[0].detail

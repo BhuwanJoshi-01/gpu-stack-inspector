@@ -236,6 +236,26 @@ class Distribution:
 
 
 @dataclass(frozen=True, slots=True)
+class TorchFacts:
+    """Static evidence about the torch an interpreter would import. Nothing was imported.
+
+    ``built_cuda``/``built_hip`` come from torch/version.py; they are only meaningful when
+    ``version_py_found`` is true, since ``None`` there means "built without CUDA".
+    ``conda_records`` is ``None`` outside conda environments.
+    """
+
+    version: str
+    location: str | None = None
+    requires_nvidia: tuple[str, ...] = ()
+    cuda_library: bool | None = None
+    hip_library: bool | None = None
+    version_py_found: bool = False
+    built_cuda: str | None = None
+    built_hip: str | None = None
+    conda_records: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class InterpreterFacts:
     """What one target Python interpreter reported about itself.
 
@@ -256,6 +276,7 @@ class InterpreterFacts:
     user_site: bool | None = None
     pythonpath_set: bool | None = None
     distributions: tuple[Distribution, ...] = ()
+    torch: TorchFacts | None = None
     failures: tuple[ProbeFailure, ...] = ()
 
     @property
