@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
+
+SCHEMA_VERSION = 1
+"""Version of the snapshot/JSON report layout; bumped only for incompatible changes."""
 
 FINDING_ID = re.compile(r"GSI-[A-Z]+-[0-9]{3}")
 """Finding codes are part of the public contract: ``GSI-<AREA>-<NNN>``, e.g. ``GSI-TORCH-002``."""
@@ -107,3 +111,22 @@ class ProbeFailure:
     probe: str
     kind: FailureKind
     detail: str
+
+
+def utc_timestamp() -> str:
+    """Current time as an ISO 8601 UTC string with second precision."""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@dataclass(frozen=True, slots=True)
+class Snapshot:
+    """Everything one run observed and concluded; the input of every renderer.
+
+    Host and interpreter facts join this record as their collectors are added.
+    """
+
+    tool_version: str
+    created_at: str
+    schema_version: int = SCHEMA_VERSION
+    probe_failures: tuple[ProbeFailure, ...] = ()
+    findings: tuple[Finding, ...] = ()

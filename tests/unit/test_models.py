@@ -1,15 +1,19 @@
 import dataclasses
+import re
 
 import pytest
 
 from gpu_stack_inspector.models import (
+    SCHEMA_VERSION,
     Confidence,
     Evidence,
     FailureKind,
     Finding,
     ProbeFailure,
     Severity,
+    Snapshot,
     Status,
+    utc_timestamp,
 )
 
 
@@ -89,3 +93,14 @@ def test_probe_failure_keeps_probe_kind_and_detail() -> None:
         FailureKind.TIMEOUT,
         "no answer within 8 s",
     )
+
+
+def test_snapshot_carries_schema_and_tool_version() -> None:
+    snapshot = Snapshot(tool_version="0.1.0", created_at="2026-11-03T10:00:00Z")
+    assert snapshot.schema_version == SCHEMA_VERSION == 1
+    assert snapshot.findings == ()
+    assert snapshot.probe_failures == ()
+
+
+def test_utc_timestamp_is_iso_8601_utc() -> None:
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", utc_timestamp())
