@@ -277,3 +277,146 @@ def torch_build_supports_cuda(snapshot: Snapshot, context: RuleContext) -> Itera
                 confidence=confidence,
                 evidence=evidence,
             )
+
+
+def _unavailable_cause(snapshot: Snapshot, interpreter: InterpreterFacts) -> str | None:
+    """The finding that explains torch.cuda.is_available() being False, if one does."""
+    if classify_torch(interpreter.torch).kind is TorchBuildKind.CPU:
+        return "GSI-TORCH-002"
+    nvidia = snapshot.nvidia
+    if nvidia is not None and nvidia.smi_path is not None and nvidia.driver_version is None:
+        return "GSI-SYS-002"
+    if nvidia is not None and nvidia.driver_version is not None and not nvidia.gpus:
+        return "GSI-SYS-003"
+    hidden = next((v for v in snapshot.cuda_environment if v.name == "CUDA_VISIBLE_DEVICES"), None)
+    if hidden is not None and hidden.value.strip() in {"", "-1"}:
+        return "GSI-ENV-003"
+    return None
+
+
+@RULES.rule("GSI-TORCH-003", "CUDA works at runtime")
+def cuda_works(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether importing torch and running a tiny CUDA operation worked (probe --runtime).
+
+    The only check that proves CUDA works: it imports torch in the target interpreter,
+    asks torch.cuda.is_available(), lists the devices and runs a tensor operation on the
+    GPU. A failure names the step and the error. "No kernel image is available" means the
+    build has no code for this GPU's compute capability. When CUDA is unavailable, the
+    finding points at the check that explains why, if one does.
+    """
+    for interpreter in snapshot.interpreters:
+        runtime = interpreter.runtime
+        if runtime is None:
+            continue
+        check = f"gpu-stack-inspector probe --runtime --python {interpreter.path}"
+        failed = next((s for s in runtime.steps if not s.ok), None)
+        if runtime.failure is not None or (failed is not None and failed.step == "import torch"):
+            detail = runtime.failure.detail if runtime.failure else (failed.error if failed else "")
+            yield Finding(
+                id="GSI-TORCH-003",
+                status=Status.FAIL,
+                severity=Severity.HIGH,
+                confidence=Confidence.HIGH,
+                summary=(
+                    "import torch fails"
+                    if runtime.failure is None
+                    else "The interpreter did not survive using CUDA"
+                ),
+                reason=detail or "No detail was reported.",
+                recommended_action=(
+                    "Run `python -c \"import torch; print(torch.ones(1, device='cuda'))\"` in this "
+                    "environment to see the whole error; missing or mismatched CUDA libraries in "
+                    "the environment are the usual cause."
+                ),
+                evidence=tuple(Evidence("runtime", s.step, s.error or "ok") for s in runtime.steps),
+                subject=interpreter.label,
+                verify_command=check,
+            )
+        elif runtime.cuda_available is False:
+            yield Finding(
+                id="GSI-TORCH-003",
+                status=Status.FAIL if context.cuda_expected else Status.NOT_APPLICABLE,
+                severity=Severity.HIGH,
+                confidence=Confidence.HIGH,
+                summary="torch.cuda.is_available() is False",
+                reason=f"torch {runtime.torch_version or '?'} found no usable CUDA device.",
+                caused_by=_unavailable_cause(snapshot, interpreter),
+                evidence=(Evidence("runtime", "cuda available", "False"),),
+                subject=interpreter.label,
+                verify_command=check,
+            )
+        elif runtime.tensor_ok is False and failed is not None:
+            error = failed.error or ""
+            capability = runtime.devices[0].compute_capability if runtime.devices else None
+            no_kernels = "no kernel image" in error.lower()
+            yield Finding(
+                id="GSI-TORCH-003",
+                status=Status.FAIL,
+                severity=Severity.HIGH,
+                confidence=Confidence.HIGH,
+                summary="A CUDA operation failed",
+                reason=error,
+                recommended_action=(
+                    f"This torch build has no GPU code for compute capability "
+                    f"{capability or 'of this GPU'}; install a build that supports this GPU "
+                    "(see the PyTorch release notes)."
+                    if no_kernels
+                    else "Check the driver with `nvidia-smi`, then run the operation by hand "
+                    "to see the whole error."
+                ),
+                evidence=(Evidence("runtime", failed.step, error),),
+                subject=interpreter.label,
+                verify_command=check,
+            )
+        elif runtime.tensor_ok is True:
+            device = runtime.devices[0].name if runtime.devices else "the GPU"
+            seconds = next((s.seconds for s in runtime.steps if s.step == "tensor operation"), None)
+            yield Finding(
+                id="GSI-TORCH-003",
+                status=Status.PASS,
+                severity=Severity.INFO,
+                confidence=Confidence.HIGH,
+                summary=f"A CUDA operation ran on {device}",
+                reason=(
+                    f"torch {runtime.torch_version or '?'} with CUDA {runtime.cuda_version or '?'}"
+                    + (
+                        f"; the tensor operation took {seconds:.2f} s."
+                        if seconds is not None
+                        else "."
+                    )
+                ),
+                evidence=tuple(Evidence("runtime", s.step, "ok") for s in runtime.steps),
+                subject=interpreter.label,
+                verify_command=check,
+            )
+
+
+@RULES.rule("GSI-TORCH-004", "CUDA was exercised at runtime")
+def cuda_exercised(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether a CUDA build of torch was actually tried, not only read from metadata.
+
+    Metadata can show a CUDA build, but only importing torch and running an operation
+    proves it works: libraries can be missing, the driver can refuse, the build can lack
+    code for this GPU. Without probe --runtime this is "not tested", never a pass.
+    """
+    for interpreter in snapshot.interpreters:
+        if interpreter.version is None or interpreter.runtime is not None:
+            continue
+        if classify_torch(interpreter.torch).kind is not TorchBuildKind.CUDA:
+            continue
+        yield Finding(
+            id="GSI-TORCH-004",
+            status=Status.NOT_TESTED,
+            severity=Severity.LOW,
+            confidence=Confidence.HIGH,
+            summary="CUDA was not exercised; only metadata was read",
+            reason=(
+                "A CUDA build can still fail at runtime: missing libraries, a driver that "
+                "refuses, or no code for this GPU."
+            ),
+            subject=interpreter.label,
+            recommended_action=(
+                f"Run `gpu-stack-inspector probe --runtime --python {interpreter.path}` to import "
+                "torch and run a tiny CUDA operation (it uses a little GPU memory)."
+            ),
+        )
