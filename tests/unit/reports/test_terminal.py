@@ -6,6 +6,7 @@ from gpu_stack_inspector.models import (
     Distribution,
     EnvironmentVariable,
     FailureKind,
+    FieldComparison,
     Finding,
     GpuDevice,
     HostFacts,
@@ -18,7 +19,7 @@ from gpu_stack_inspector.models import (
     ToolkitFacts,
     TorchFacts,
 )
-from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.reports.terminal import render_compare, render_terminal
 
 
 def render(snapshot: Snapshot) -> str:
@@ -212,3 +213,52 @@ def test_findings_about_the_comparison_come_last() -> None:
     lines = [" ".join(line.split()) for line in render(snapshot).splitlines()]
     assert lines.index("Comparison") > lines.index("A /a")
     assert any(line.startswith("WARN GSI-DIFF-001 different builds") for line in lines)
+
+
+COMPARED = Snapshot(
+    "0.1.0",
+    "t",
+    interpreters=(
+        InterpreterFacts("A", "~/envs/works/bin/python"),
+        InterpreterFacts("B", "~/envs/broken/bin/python"),
+    ),
+    comparison=(
+        FieldComparison("Python", ("3.13.13", "3.12.13")),
+        FieldComparison("platform", ("linux-x86_64", "linux-x86_64")),
+        FieldComparison("torch build", ("CUDA 12.8", "CPU only")),
+        FieldComparison("nvidia-cudnn-cu12", ("9.10.2.21", None)),
+    ),
+)
+
+
+def render_comparison(snapshot: Snapshot, show_all: bool = False) -> list[str]:
+    console = Console(record=True, width=120, color_system=None)
+    render_compare(snapshot, console, show_all=show_all)
+    return [" ".join(line.split()) for line in console.export_text().splitlines()]
+
+
+def test_the_comparison_shows_only_differences_by_default() -> None:
+    lines = render_comparison(COMPARED)
+    assert "A ~/envs/works/bin/python" in lines
+    assert "B ~/envs/broken/bin/python" in lines
+    assert "Field A B" in lines
+    assert "torch build CUDA 12.8 CPU only" in lines
+    assert "nvidia-cudnn-cu12 9.10.2.21 —" in lines
+    assert not any(line.startswith("platform") for line in lines)
+    assert "1 identical fields hidden; --all shows them." in lines
+
+
+def test_all_fields_are_shown_on_request() -> None:
+    lines = render_comparison(COMPARED, show_all=True)
+    assert "platform linux-x86_64 linux-x86_64" in lines
+    assert not any("hidden" in line for line in lines)
+
+
+def test_identical_environments_say_so() -> None:
+    same = Snapshot(
+        "0.1.0",
+        "t",
+        interpreters=COMPARED.interpreters,
+        comparison=(FieldComparison("Python", ("3.12", "3.12")),),
+    )
+    assert "No differences in the compared fields." in render_comparison(same)

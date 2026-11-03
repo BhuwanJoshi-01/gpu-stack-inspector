@@ -20,7 +20,7 @@ from gpu_stack_inspector.exit_codes import ExitCode
 from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
 from gpu_stack_inspector.reports.json_report import render_json
-from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.reports.terminal import render_compare, render_terminal
 from gpu_stack_inspector.rules.catalog import builtin_rules
 from gpu_stack_inspector.rules.engine import RuleContext
 from gpu_stack_inspector.runner import SubprocessRunner
@@ -142,6 +142,46 @@ def inspect(
         typer.echo(render_json(redacted), nl=False)
     else:
         render_terminal(redacted, Console())
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+@app.command()
+def compare(
+    python: Annotated[
+        list[str],
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help="An interpreter to compare. Give it at least twice.",
+        ),
+    ],
+    output_format: Annotated[
+        OutputFormat, typer.Option("--format", "-f", help="Output format.")
+    ] = OutputFormat.TEXT,
+    show_all: Annotated[
+        bool, typer.Option("--all", help="Show the fields that are the same too.")
+    ] = False,
+) -> None:
+    """Compare interpreters side by side: which fields differ, and what that means.
+
+    Read-only, like inspect: interpreters are inspected from their metadata only.
+    """
+    if len(python) < 2:
+        raise typer.BadParameter("give --python at least twice", param_hint="--python")
+    shell_python = next(iter(orchestrator.default_interpreters()), None)
+    snapshot = orchestrator.with_comparison(
+        orchestrator.diagnose(
+            orchestrator.inspect(SubprocessRunner(), python),
+            RuleContext(shell_python=shell_python),
+        )
+    )
+    redacted = Redactor(RedactionContext.current()).redact(snapshot)
+    if output_format is OutputFormat.JSON:
+        typer.echo(render_json(redacted), nl=False)
+    else:
+        render_compare(redacted, Console(), show_all=show_all)
     if _unusable_interpreters(snapshot):
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
 

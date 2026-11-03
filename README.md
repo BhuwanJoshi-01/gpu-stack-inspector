@@ -13,8 +13,8 @@ GPU Stack Inspector inspects **several interpreters from one command** and shows
 with the evidence for each finding:
 
 ```bash
-gpu-stack-inspector inspect --python ~/envs/works/bin/python --python ~/envs/broken/bin/python   # works today
 gpu-stack-inspector compare --python ~/envs/works/bin/python --python ~/envs/broken/bin/python
+gpu-stack-inspector inspect --python ~/envs/broken/bin/python          # one environment in detail
 gpu-stack-inspector probe --runtime --python ~/envs/broken/bin/python   # opt-in: really runs a tiny CUDA op
 gpu-stack-inspector report --format markdown --output gpu-report.md     # redacted, safe to paste in an issue
 gpu-stack-inspector rules list                                          # every check; `rules explain CODE` for one

@@ -7,7 +7,7 @@ from dataclasses import fields, is_dataclass
 from enum import Enum
 from typing import Any
 
-from gpu_stack_inspector.models import InterpreterFacts, Snapshot
+from gpu_stack_inspector.models import FieldComparison, InterpreterFacts, Snapshot
 from gpu_stack_inspector.rules.torch_build import classify_torch
 
 
@@ -33,6 +33,8 @@ def _plain(value: Any) -> Any:
             # Derived from the facts above, but what readers and scripts look for.
             result["virtualenv"] = value.virtualenv
             result["torch_build"] = _plain(classify_torch(value.torch))
+        if isinstance(value, FieldComparison):
+            result["differs"] = value.differs
         return result
     if isinstance(value, tuple | list):
         return [_plain(item) for item in value]

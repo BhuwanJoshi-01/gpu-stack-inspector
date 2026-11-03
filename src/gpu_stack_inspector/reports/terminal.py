@@ -26,7 +26,7 @@ from gpu_stack_inspector.rules.torch_build import TorchBuild, TorchBuildKind, cl
 _INDENT = "         "
 
 
-def render_terminal(snapshot: Snapshot, console: Console) -> None:
+def _render_header(snapshot: Snapshot, console: Console) -> None:
     console.print(Text(f"GPU Stack Inspector {snapshot.tool_version}", style="bold"))
     console.print(_row("Host", _host(snapshot.host)))
     nvidia_lines = _nvidia(snapshot.nvidia)
@@ -34,6 +34,46 @@ def render_terminal(snapshot: Snapshot, console: Console) -> None:
     for line in nvidia_lines[1:]:
         console.print(Text(_INDENT + line))
     console.print(_row("Toolkit", _toolkit(snapshot.toolkit)))
+
+
+def _render_failures(snapshot: Snapshot, console: Console) -> None:
+    if snapshot.probe_failures:
+        console.print()
+        console.print(Text("Could not check:", style="bold"))
+        for failure in snapshot.probe_failures:
+            console.print(Text(f"  {failure.probe}: {failure.detail}"))
+
+
+def render_compare(snapshot: Snapshot, console: Console, *, show_all: bool = False) -> None:
+    """The comparison table (only the fields that differ, unless ``show_all``), then findings."""
+    _render_header(snapshot, console)
+    console.print()
+    for interpreter in snapshot.interpreters:
+        console.print(Text.assemble((f"{interpreter.label:<3}", "bold"), interpreter.path))
+    rows = [row for row in snapshot.comparison if show_all or row.differs]
+    console.print()
+    if not rows:
+        console.print(Text("No differences in the compared fields."))
+    else:
+        table = Table(box=None, pad_edge=False, show_edge=False)
+        table.add_column("Field", no_wrap=True)
+        for interpreter in snapshot.interpreters:
+            table.add_column(interpreter.label, overflow="fold")
+        for row in rows:
+            style = "bold" if row.differs else "dim"
+            values = [Text(value if value is not None else "—") for value in row.values]
+            table.add_row(Text(row.field, style=style), *values)
+        console.print(table)
+        hidden = len(snapshot.comparison) - len(rows)
+        if hidden:
+            console.print(Text(f"{hidden} identical fields hidden; --all shows them.", style="dim"))
+    if snapshot.findings:
+        _render_findings(snapshot, console)
+    _render_failures(snapshot, console)
+
+
+def render_terminal(snapshot: Snapshot, console: Console) -> None:
+    _render_header(snapshot, console)
     if snapshot.cuda_environment:
         values = ", ".join(
             f"{v.name}={v.value}" if v.value else f'{v.name}="" (hides every GPU)'
@@ -46,11 +86,7 @@ def render_terminal(snapshot: Snapshot, console: Console) -> None:
         console.print(Text("   " + _interpreter(interpreter)))
     if snapshot.findings:
         _render_findings(snapshot, console)
-    if snapshot.probe_failures:
-        console.print()
-        console.print(Text("Could not check:", style="bold"))
-        for failure in snapshot.probe_failures:
-            console.print(Text(f"  {failure.probe}: {failure.detail}"))
+    _render_failures(snapshot, console)
 
 
 def _row(name: str, value: str) -> Text:
