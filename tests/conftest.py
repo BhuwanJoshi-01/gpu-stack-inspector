@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import socket
 from typing import Any
 
 import pytest
+from hypothesis import settings
+
+# HYPOTHESIS_PROFILE=thorough runs the property tests with many more examples.
+settings.register_profile("thorough", max_examples=2000)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 _LOCAL_FAMILIES = {getattr(socket, "AF_UNIX", None)} - {None}
 
