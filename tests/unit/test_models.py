@@ -10,6 +10,7 @@ from gpu_stack_inspector.models import (
     FailureKind,
     Finding,
     GpuDevice,
+    InterpreterFacts,
     NvidiaFacts,
     ProbeFailure,
     Severity,
@@ -119,3 +120,12 @@ def test_gpu_device_values_default_to_unknown() -> None:
     gpu = GpuDevice(index=0, name="NVIDIA GeForce RTX 3050 Laptop GPU")
     assert gpu.memory_total_mib is None
     assert gpu.compute_capability is None
+
+
+def test_virtualenv_is_known_only_when_both_prefixes_are() -> None:
+    base = InterpreterFacts(label="A", path="/envs/a/bin/python")
+    assert base.virtualenv is None
+    venv = InterpreterFacts(label="A", path="/p/bin/python", prefix="/p", base_prefix="/usr")
+    assert venv.virtualenv is True
+    plain = InterpreterFacts(label="B", path="/usr/bin/python3", prefix="/usr", base_prefix="/usr")
+    assert plain.virtualenv is False

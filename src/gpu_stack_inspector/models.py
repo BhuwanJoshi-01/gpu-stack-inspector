@@ -217,3 +217,47 @@ class EnvironmentVariable:
 
     name: str
     value: str
+
+
+@dataclass(frozen=True, slots=True)
+class Distribution:
+    """An installed distribution relevant to GPU use, as the target interpreter sees it.
+
+    ``location`` is the directory it was found in; the same name in two locations (a
+    user site and the environment, say) is how shadowed installs show up.
+    """
+
+    name: str
+    version: str
+    location: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InterpreterFacts:
+    """What one target Python interpreter reported about itself.
+
+    ``path`` is the interpreter as the user named it, made absolute but with symlinks
+    kept: a virtual environment's ``bin/python`` is a symlink, and following it would
+    start the base interpreter outside the environment.
+    """
+
+    label: str
+    path: str
+    executable: str | None = None
+    version: str | None = None
+    implementation: str | None = None
+    prefix: str | None = None
+    base_prefix: str | None = None
+    conda: bool | None = None
+    platform: str | None = None
+    user_site: bool | None = None
+    pythonpath_set: bool | None = None
+    distributions: tuple[Distribution, ...] = ()
+    failures: tuple[ProbeFailure, ...] = ()
+
+    @property
+    def virtualenv(self) -> bool | None:
+        """Whether the interpreter runs inside a venv/virtualenv, if that is known."""
+        if self.prefix is None or self.base_prefix is None:
+            return None
+        return self.prefix != self.base_prefix
