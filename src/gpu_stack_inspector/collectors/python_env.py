@@ -21,14 +21,15 @@ _INTERPRETERS_IN_AN_ENVIRONMENT = (
 
 
 def interpreter_path(
-    raw: str, *, cwd: Path | None = None
+    raw: str, *, cwd: Path | None = None, windows: bool = os.name == "nt"
 ) -> tuple[Path | None, ProbeFailure | None]:
     """Turn a ``--python`` argument into an absolute path that can be run.
 
     ``~`` is expanded and relative paths are taken from ``cwd``. Symlinks are kept on
     purpose: a virtual environment's ``bin/python`` is a symlink to the base
     interpreter, and only the symlink's location tells Python it runs inside the venv.
-    Returns the path, or the reason it cannot be used.
+    On Windows a path without a suffix also matches ``<path>.exe``, as it does in the
+    shell (``.venv\\Scripts\\python``). Returns the path, or the reason it cannot be used.
     """
     text = raw.strip()
     if not text:
@@ -36,6 +37,8 @@ def interpreter_path(
     path = Path(text).expanduser()
     if not path.is_absolute():
         path = (cwd or Path.cwd()) / path
+    if windows and not path.exists() and not path.suffix and path.with_suffix(".exe").exists():
+        path = path.with_suffix(".exe")
     if not path.exists():
         if path.is_symlink():
             target = path.readlink()

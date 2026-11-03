@@ -14,10 +14,10 @@ from gpu_stack_inspector.models import FailureKind
 posix_only = pytest.mark.skipif(os.name != "posix", reason="POSIX permissions and symlinks")
 
 
-def check(raw: str, cwd: Path) -> Any:
+def check(raw: str, cwd: Path, **kwargs: Any) -> Any:
     from gpu_stack_inspector.collectors.python_env import interpreter_path
 
-    return interpreter_path(raw, cwd=cwd)
+    return interpreter_path(raw, cwd=cwd, **kwargs)
 
 
 def fake_python(directory: Path, name: str = "python") -> Path:
@@ -106,3 +106,16 @@ def test_a_plain_directory_gets_no_suggestion(tmp_path: Path) -> None:
     path, failure = check(str(tmp_path), tmp_path)
     assert path is None
     assert failure.detail == f"{tmp_path} is a directory, not an interpreter"
+
+
+def test_on_windows_a_path_without_exe_finds_the_exe(tmp_path: Path) -> None:
+    program = fake_python(tmp_path / "venv" / "Scripts", "python.exe")
+    path, failure = check(str(tmp_path / "venv" / "Scripts" / "python"), tmp_path, windows=True)
+    assert (path, failure) == (program, None)
+
+
+def test_elsewhere_a_missing_path_is_not_completed_with_exe(tmp_path: Path) -> None:
+    fake_python(tmp_path / "venv" / "Scripts", "python.exe")
+    path, failure = check(str(tmp_path / "venv" / "Scripts" / "python"), tmp_path, windows=False)
+    assert path is None
+    assert failure.kind is FailureKind.NOT_FOUND
