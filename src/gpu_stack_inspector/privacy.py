@@ -59,6 +59,24 @@ def _safe(read: Callable[[], str]) -> str | None:
 
 Replacement = str | Callable[[re.Match[str]], str]
 
+_MIN_NAME_LENGTH = 3
+_GENERIC_NAMES = frozenset(
+    {
+        "root", "user", "admin", "guest", "localhost", "linux", "ubuntu", "debian",
+        "fedora", "arch", "archlinux", "manjaro", "pop-os", "mint", "kali", "raspberrypi",
+    }
+)  # fmt: skip
+"""Names that identify nobody and appear in ordinary text (distribution names as hosts)."""
+
+
+def _word_pattern(name: str) -> re.Pattern[str] | None:
+    if len(name) < _MIN_NAME_LENGTH or name.lower() in _GENERIC_NAMES:
+        return None
+    # Whole words only: not inside "malice" or "alice_env", not an already redacted
+    # "<user>", but a sentence-ending period is fine.
+    return re.compile(rf"(?<![\w.<>-]){re.escape(name)}(?![\w<>-]|\.\w)")
+
+
 # Other accounts' home directories. The name may not start with "<", so already redacted
 # paths are left alone.
 _OTHER_HOMES: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -84,6 +102,14 @@ class Redactor:
             self._steps.append(("home_path", re.compile(re.escape(home) + boundary), "~"))
         for pattern, replacement in _OTHER_HOMES:
             self._steps.append(("home_path", pattern, replacement))
+        # Host before user: "alice-laptop" is a host name even when the user is "alice".
+        for category, name, placeholder in (
+            ("host_name", context.hostname, "<host>"),
+            ("user_name", context.user, "<user>"),
+        ):
+            word = _word_pattern(name) if name else None
+            if word is not None:
+                self._steps.append((category, word, placeholder))
 
     def text(self, value: str) -> str:
         """Return ``value`` without control characters, identifying or secret values."""

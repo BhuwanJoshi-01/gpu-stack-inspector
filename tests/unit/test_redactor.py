@@ -46,7 +46,6 @@ def test_home_directories_are_hidden(raw: str, clean: str) -> None:
 # --- user and host names ----------------------------------------------------------------
 
 
-@pending
 @pytest.mark.parametrize(
     ("raw", "clean"),
     [
@@ -233,3 +232,8 @@ def test_context_for_the_current_user_tolerates_missing_information(
     context = RedactionContext.current()
     assert context.user is None
     assert context.home
+
+
+def test_a_name_ending_a_sentence_is_hidden_but_not_one_inside_a_domain() -> None:
+    assert text("This env belongs to alice.") == "This env belongs to <user>."
+    assert text("see alice.example.org") == "see alice.example.org"
