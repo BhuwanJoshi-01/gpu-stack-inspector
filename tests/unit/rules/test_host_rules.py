@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from gpu_stack_inspector.models import (
+    EnvironmentVariable,
     FailureKind,
     Finding,
     GpuDevice,
@@ -125,3 +128,49 @@ def test_one_missing_tool_gives_one_warning_and_two_consequences() -> None:
         ("GSI-SYS-002", Status.NOT_TESTED, "GSI-SYS-001"),
         ("GSI-SYS-003", Status.NOT_TESTED, "GSI-SYS-001"),
     ]
+
+
+def env_finding(value: str, nvidia: NvidiaFacts = WORKING) -> Finding:
+    snap = snapshot(
+        nvidia=nvidia, cuda_environment=(EnvironmentVariable("CUDA_VISIBLE_DEVICES", value),)
+    )
+    return findings(snap, prefix="GSI-ENV")["GSI-ENV-003"]
+
+
+@pytest.mark.parametrize("value", ["", "-1", " ", "NoDevFiles"])
+def test_values_that_hide_every_gpu_warn(value: str) -> None:
+    result = env_finding(value)
+    assert result.status is Status.WARN
+    assert result.summary == "CUDA_VISIBLE_DEVICES hides every GPU"
+
+
+def test_an_index_beyond_the_gpus_stops_cuda_there() -> None:
+    result = env_finding("1,0")
+    assert result.status is Status.WARN
+    assert result.summary == "CUDA_VISIBLE_DEVICES names GPU 1, which does not exist"
+    assert "no GPU is visible" in result.reason
+
+
+def test_devices_before_an_invalid_index_stay_visible() -> None:
+    two = NvidiaFacts(
+        "/usr/bin/nvidia-smi", "595.99.02", "13.2", (GpuDevice(0, "A"), GpuDevice(1, "B"))
+    )
+    result = env_finding("0,5,1", two)
+    assert "only GPU(s) 0 are visible" in result.reason
+
+
+def test_a_valid_selection_passes() -> None:
+    result = env_finding("0")
+    assert result.status is Status.PASS
+    assert result.limitations == ()
+
+
+def test_uuids_pass_with_a_limitation() -> None:
+    result = env_finding("GPU-a3f5e3f2")
+    assert result.status is Status.PASS
+    assert result.confidence.value == "medium"
+    assert result.limitations
+
+
+def test_nothing_is_said_when_the_variable_is_not_set() -> None:
+    assert "GSI-ENV-003" not in findings(snapshot(nvidia=WORKING), prefix="GSI-ENV")

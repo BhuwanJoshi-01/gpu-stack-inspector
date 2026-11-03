@@ -173,3 +173,87 @@ def gpu_visible(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
         reason=names,
         evidence=tuple(Evidence(SMI, f"gpu{gpu.index}", gpu.name) for gpu in nvidia.gpus),
     )
+
+
+_HIDE_ALL = frozenset({"", "-1", "none", "nodevfiles"})
+
+
+@RULES.rule(
+    "GSI-ENV-003",
+    "CUDA_VISIBLE_DEVICES does not hide the GPUs",
+    sources=("https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#env-vars",),
+)
+def visible_devices(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether CUDA_VISIBLE_DEVICES, when set, leaves the GPUs visible to CUDA programs.
+
+    An empty value (or -1) hides every GPU from CUDA while nvidia-smi still lists it,
+    which looks exactly like a broken install. CUDA also stops at the first index that
+    does not exist: with "1,0" on a one-GPU machine no GPU is visible at all. GPU UUIDs
+    are not checked, because the tool does not collect them.
+    """
+    variable = next(
+        (v for v in snapshot.cuda_environment if v.name == "CUDA_VISIBLE_DEVICES"), None
+    )
+    if variable is None:
+        return
+    value = variable.value.strip()
+    evidence = (Evidence("environment", "CUDA_VISIBLE_DEVICES", variable.value),)
+    shown = repr(variable.value)
+    if value.lower() in _HIDE_ALL:
+        yield Finding(
+            id="GSI-ENV-003",
+            status=Status.WARN,
+            severity=Severity.HIGH,
+            confidence=Confidence.HIGH,
+            summary="CUDA_VISIBLE_DEVICES hides every GPU",
+            reason=(
+                f"It is set to {shown}, so CUDA programs started from this environment see no "
+                "GPU, even though nvidia-smi lists them."
+            ),
+            evidence=evidence,
+            recommended_action=(
+                "Unset CUDA_VISIBLE_DEVICES, or set it to the GPU index to use (e.g. 0)."
+            ),
+            verify_command='echo "$CUDA_VISIBLE_DEVICES"',
+        )
+        return
+    entries = [entry.strip() for entry in value.split(",")]
+    count = len(snapshot.nvidia.gpus) if snapshot.nvidia else 0
+    if count and all(entry.isdigit() for entry in entries):
+        invalid = next((int(e) for e in entries if int(e) >= count), None)
+        if invalid is not None:
+            usable = entries[: entries.index(str(invalid))]
+            yield Finding(
+                id="GSI-ENV-003",
+                status=Status.WARN,
+                severity=Severity.HIGH if not usable else Severity.MEDIUM,
+                confidence=Confidence.HIGH,
+                summary=f"CUDA_VISIBLE_DEVICES names GPU {invalid}, which does not exist",
+                reason=(
+                    f"It is set to {shown}, but the driver lists {count} GPU(s). CUDA stops at "
+                    "the first index that does not exist, so "
+                    + (
+                        f"only GPU(s) {', '.join(usable)} are visible."
+                        if usable
+                        else "no GPU is visible."
+                    )
+                ),
+                evidence=evidence,
+                recommended_action="Use indices from `nvidia-smi -L`, or unset the variable.",
+                verify_command="nvidia-smi -L",
+            )
+            return
+    yield Finding(
+        id="GSI-ENV-003",
+        status=Status.PASS,
+        severity=Severity.INFO,
+        confidence=Confidence.MEDIUM if not all(e.isdigit() for e in entries) else Confidence.HIGH,
+        summary=f"CUDA_VISIBLE_DEVICES limits CUDA to {value}",
+        reason="CUDA programs only see the GPUs listed there.",
+        evidence=evidence,
+        limitations=(
+            ("GPU UUIDs and MIG devices are not checked: the tool does not collect them.",)
+            if not all(e.isdigit() for e in entries)
+            else ()
+        ),
+    )
