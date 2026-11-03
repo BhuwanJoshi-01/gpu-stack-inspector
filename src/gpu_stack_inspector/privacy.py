@@ -69,9 +69,8 @@ _REDACTED_TOKEN = "<redacted-token>"  # noqa: S105 - the placeholder, not a toke
 _URL_CREDENTIALS = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]*://)([^/\s?#]*)@")
 """``scheme://user:password@`` — greedy up to the last ``@`` of the authority."""
 
-_ASSIGNMENT = re.compile(
-    r"""(?<![\w-])([A-Za-z_][A-Za-z0-9_]*)(["']?\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)"""
-)
+_NAME_AND_SEPARATOR = re.compile(r"""(?<![\w-])([A-Za-z_][A-Za-z0-9_]*)(["']?\s*[=:]\s*)""")
+_VALUE = re.compile(r"""("[^"]*"|'[^']*'|[^\s,;}]+)""")
 """``NAME=value``, ``name: value``, ``"name": "value"``; the name decides if it is secret."""
 
 _SECRET_SUFFIXES = ("token", "secret", "password", "passwd", "apikey", "credential", "credentials")
@@ -154,7 +153,7 @@ class Redactor:
         """Return ``value`` without control characters, identifying or secret values."""
         result = strip_control(value)
         result = _URL_CREDENTIALS.sub(self._url_credentials, result)
-        result = _ASSIGNMENT.sub(self._assignment, result)
+        result = self._secret_assignments(result)
         for token_pattern, placeholder in (
             (_TOKENS, _REDACTED_TOKEN),
             (_BEARER, r"\1" + _REDACTED_TOKEN),
@@ -203,9 +202,23 @@ class Redactor:
         self._counts["url_credentials"] += 1
         return f"{scheme}{_REDACTED}@"
 
-    def _assignment(self, match: re.Match[str]) -> str:
-        name, separator, value = match.groups()
-        if not _is_secret_name(name) or value.startswith("<redacted"):
-            return match.group(0)
-        self._counts["secret_value"] += 1
-        return f"{name}{separator}{_REDACTED}"
+    def _secret_assignments(self, text: str) -> str:
+        # Scanned by hand rather than with re.sub: the value of a harmless name must not be
+        # consumed, or "env: DB_PASSWORD=hunter2" would hide the password inside the value
+        # of "env". After a harmless name the scan resumes right after its separator.
+        parts: list[str] = []
+        pos = 0
+        while match := _NAME_AND_SEPARATOR.search(text, pos):
+            parts.append(text[pos : match.end()])
+            pos = match.end()
+            value = _VALUE.match(text, pos)
+            if (
+                value is not None
+                and _is_secret_name(match.group(1))
+                and not value.group(0).startswith("<redacted")
+            ):
+                parts.append(_REDACTED)
+                pos = value.end()
+                self._counts["secret_value"] += 1
+        parts.append(text[pos:])
+        return "".join(parts)

@@ -228,3 +228,15 @@ def test_context_for_the_current_user_tolerates_missing_information(
 def test_a_name_ending_a_sentence_is_hidden_but_not_one_inside_a_domain() -> None:
     assert text("This env belongs to alice.") == "This env belongs to <user>."
     assert text("see alice.example.org") == "see alice.example.org"
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ("env: DB_PASSWORD=hunter2", "env: DB_PASSWORD=<redacted>"),
+        ("x= API_KEY=secret", "x= API_KEY=<redacted>"),
+        ("settings: {token: abc, name: x}", "settings: {token: <redacted>, name: x}"),
+    ],
+)
+def test_a_secret_inside_the_value_of_a_harmless_name_is_still_found(raw: str, clean: str) -> None:
+    assert text(raw) == clean
