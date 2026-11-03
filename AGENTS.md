@@ -14,6 +14,8 @@ uv sync                                    # create .venv with the dev tools
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest -q   # what CI runs
 uv run pytest -q --cov                     # with coverage
 GSI_INTEGRATION=1 uv run pytest -q tests/integration   # against this machine's GPU/driver
+GSI_TEST_PYTHONS="$(uv python find --no-project 3.9):$HOME/env/bin/python" uv run pytest -q tests/integration
+                                                       # probe inside other interpreters (CI: 3.8-3.10, PyPy)
 HYPOTHESIS_PROFILE=thorough uv run pytest -q           # property tests with 2000 examples
 ```
 
@@ -27,10 +29,16 @@ src/gpu_stack_inspector/
                   capped output), probe_failure()
   privacy.py      strip_control(), RedactionContext, Redactor (text + whole snapshots, summary)
   exit_codes.py   ExitCode: 0 ok, 1 strict, 2 error, 3 context unavailable, 130 interrupted
-  orchestrator.py inspect_host(): runs the collectors, assembles the Snapshot (no diagnosis)
+  orchestrator.py inspect_host() / inspect(): runs the collectors and the interpreter probe,
+                  assembles the Snapshot (no diagnosis); default_interpreters()
+  probes/         metadata_program.py: runs INSIDE target interpreters (Python 3.8+, stdlib only,
+                  never imports target packages, prints one JSON doc between markers);
+                  metadata_probe.py: runs it in an empty temp cwd and parses the answer defensively
+  reports/        json_report.py, terminal.py (plain Text, never Rich markup from collected data)
   collectors/     host.py (OS, distro, WSL flag), nvidia.py (nvidia-smi query, --version, table
                   header fallback), toolkit.py (nvcc, /usr/local/cuda*, /opt/cuda*, CUDA_HOME…),
-                  environment.py (allowlisted CUDA variables only)
+                  environment.py (allowlisted CUDA variables only), python_env.py (--python paths;
+                  symlinks are never resolved, a venv's python must stay in its venv)
 tests/
   conftest.py     autouse no_network guard; HYPOTHESIS_PROFILE=thorough
   fakes.py        FakeRunner: scripted commands only, anything else fails the test
@@ -42,6 +50,9 @@ docs/roadmap.md   requirement IDs GPU-001 … and what v0.1 includes
 ```
 
 ## Rules that are easy to break
+
+- **The probe program is not the tool.** `probes/*_program.py` must stay Python 3.8 syntax and stdlib
+  only (tests parse it with `feature_version=(3, 8)` and check its imports; CI runs it in 3.8-3.10 and PyPy).
 
 - **Never import a target environment's packages** (torch, nvidia-*) into this process. Probes run as subprocesses
   of the target interpreter. Importing torch is only allowed in the opt-in runtime probe.
