@@ -7,13 +7,19 @@ from __future__ import annotations
 
 import os
 import sys
+from enum import StrEnum
 from typing import Annotated
 
 import typer
+from rich.console import Console
 
-from gpu_stack_inspector import __version__
+from gpu_stack_inspector import __version__, orchestrator
 from gpu_stack_inspector.exit_codes import ExitCode
+from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
+from gpu_stack_inspector.reports.json_report import render_json
+from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.runner import SubprocessRunner
 
 HELP = (
     "Explain why PyTorch can use the GPU in one Python environment but not another.\n\n"
@@ -48,6 +54,62 @@ def cli(
     ] = False,
 ) -> None:
     """Global options (the help text comes from HELP)."""
+
+
+class OutputFormat(StrEnum):
+    TEXT = "text"
+    JSON = "json"
+
+
+@app.command()
+def inspect(
+    python: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help=(
+                "Python interpreter to inspect. Repeat it to inspect several. "
+                "Default: the python on PATH."
+            ),
+        ),
+    ] = None,
+    output_format: Annotated[
+        OutputFormat, typer.Option("--format", "-f", help="Output format.")
+    ] = OutputFormat.TEXT,
+) -> None:
+    """Inspect this machine and Python interpreters, read-only.
+
+    Interpreters are inspected from their metadata only; nothing is imported into
+    them beyond the standard library.
+    """
+    pythons = python or orchestrator.default_interpreters()
+    if not pythons:
+        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
+    snapshot = orchestrator.inspect(SubprocessRunner(), pythons)
+    redacted = Redactor(RedactionContext.current()).redact(snapshot)
+    if output_format is OutputFormat.JSON:
+        typer.echo(render_json(redacted), nl=False)
+    else:
+        render_terminal(redacted, Console())
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+_UNUSABLE = frozenset({FailureKind.NOT_FOUND, FailureKind.PERMISSION_DENIED})
+
+
+def _unusable_interpreters(snapshot: Snapshot) -> bool:
+    """A named interpreter that could not even be started: exit code 3, after the report.
+
+    An interpreter that starts and then crashes is a finding about that environment,
+    not missing context, so it does not count.
+    """
+    return any(
+        interpreter.version is None and any(f.kind in _UNUSABLE for f in interpreter.failures)
+        for interpreter in snapshot.interpreters
+    )
 
 
 def main() -> None:

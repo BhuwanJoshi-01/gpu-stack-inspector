@@ -87,3 +87,16 @@ def _tagged_failures(interpreters: Sequence[InterpreterFacts]) -> list[ProbeFail
         for facts in interpreters
         for failure in facts.failures
     ]
+
+
+def default_interpreters(which: Callable[[str], str | None] = shutil.which) -> list[str]:
+    """The interpreter the user's shell would run: ``python``, else ``python3``, on PATH.
+
+    Not the tool's own interpreter: installed with pipx or ``uv tool`` it lives in an
+    isolated environment that tells the user nothing about their projects.
+    """
+    for name in ("python", "python3"):
+        found = which(name)
+        if found:
+            return [found]
+    return []
