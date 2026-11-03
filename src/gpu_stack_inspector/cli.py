@@ -129,14 +129,7 @@ def inspect(
     Interpreters are inspected from their metadata only; nothing is imported into
     them beyond the standard library.
     """
-    shell_python = next(iter(orchestrator.default_interpreters()), None)
-    pythons = python or ([shell_python] if shell_python else [])
-    if not pythons:
-        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
-    snapshot = orchestrator.diagnose(
-        orchestrator.inspect(SubprocessRunner(), pythons),
-        RuleContext(shell_python=shell_python),
-    )
+    snapshot = _collect(python, compare=False)
     redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
@@ -170,13 +163,7 @@ def compare(
     """
     if len(python) < 2:
         raise typer.BadParameter("give --python at least twice", param_hint="--python")
-    shell_python = next(iter(orchestrator.default_interpreters()), None)
-    snapshot = orchestrator.with_comparison(
-        orchestrator.diagnose(
-            orchestrator.inspect(SubprocessRunner(), python),
-            RuleContext(shell_python=shell_python),
-        )
-    )
+    snapshot = _collect(python, compare=True)
     redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
@@ -184,6 +171,23 @@ def compare(
         render_compare(redacted, Console(), show_all=show_all)
     if _unusable_interpreters(snapshot):
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+def _collect(python: list[str] | None, *, compare: bool) -> Snapshot:
+    """Inspect, run every check and, if asked, compare: the shared part of each command.
+
+    Without interpreters the python on PATH is used; the shell's python also goes into the
+    rule context.
+    """
+    shell_python = next(iter(orchestrator.default_interpreters()), None)
+    pythons = python or ([shell_python] if shell_python else [])
+    if not pythons:
+        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
+    snapshot = orchestrator.diagnose(
+        orchestrator.inspect(SubprocessRunner(), pythons),
+        RuleContext(shell_python=shell_python),
+    )
+    return orchestrator.with_comparison(snapshot) if compare else snapshot
 
 
 _UNUSABLE = frozenset({FailureKind.NOT_FOUND, FailureKind.PERMISSION_DENIED})
