@@ -1,6 +1,10 @@
+import json
+from pathlib import Path
+
 from gpu_stack_inspector import __version__
 from gpu_stack_inspector.models import EnvironmentVariable, FailureKind, HostFacts
-from gpu_stack_inspector.orchestrator import inspect_host
+from gpu_stack_inspector.orchestrator import inspect, inspect_host, interpreter_label
+from gpu_stack_inspector.probes.metadata_probe import program_source
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner, read_fixture
 
@@ -46,3 +50,41 @@ def test_a_machine_without_nvidia_tools_runs_no_commands() -> None:
     assert snapshot.nvidia is not None
     assert snapshot.nvidia.smi_path is None
     assert snapshot.probe_failures == ()
+
+
+def test_interpreters_are_labelled_in_order_and_their_failures_tagged(tmp_path: Path) -> None:
+    good = tmp_path / "a" / "bin" / "python"
+    good.parent.mkdir(parents=True)
+    good.write_text("#!/bin/sh\n")
+    good.chmod(0o755)
+    runner = FakeRunner()
+    document = {"protocol": 1, "errors": [], "python": {"version": "3.12.13"}, "distributions": []}
+    runner.script(
+        str(good),
+        "-c",
+        program_source(),
+        stdout=f"GSI-PROBE-BEGIN{json.dumps(document)}GSI-PROBE-END",
+    )
+    snapshot = inspect(
+        runner,
+        [str(good), str(tmp_path / "missing" / "python")],
+        which=lambda _: None,
+        environ={},
+        toolkit_roots=(),
+        host=lambda: HOST,
+    )
+    assert [(i.label, i.version) for i in snapshot.interpreters] == [("A", "3.12.13"), ("B", None)]
+    assert [(f.probe, f.kind) for f in snapshot.probe_failures] == [
+        ("python B", FailureKind.NOT_FOUND)
+    ]
+
+
+def test_without_interpreters_only_the_host_is_inspected() -> None:
+    snapshot = inspect(
+        FakeRunner(), [], which=lambda _: None, environ={}, toolkit_roots=(), host=lambda: HOST
+    )
+    assert snapshot.interpreters == ()
+
+
+def test_labels_run_from_a_to_z_and_then_number() -> None:
+    assert [interpreter_label(i) for i in (0, 1, 25, 26)] == ["A", "B", "Z", "#27"]

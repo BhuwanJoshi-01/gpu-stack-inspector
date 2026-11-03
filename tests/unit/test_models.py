@@ -86,6 +86,7 @@ def test_failure_kinds_are_the_documented_json_strings() -> None:
         "nonzero_exit",
         "malformed_output",
         "os_error",
+        "probe_error",
     ]
 
 
