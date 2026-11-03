@@ -5,6 +5,7 @@ from gpu_stack_inspector import __version__
 from gpu_stack_inspector.models import EnvironmentVariable, FailureKind, HostFacts
 from gpu_stack_inspector.orchestrator import (
     default_interpreters,
+    diagnose,
     inspect,
     inspect_host,
     interpreter_label,
@@ -100,3 +101,12 @@ def test_the_default_interpreter_is_the_python_on_path() -> None:
     assert default_interpreters(found.get) == ["/envs/a/bin/python"]
     assert default_interpreters({"python3": "/usr/bin/python3"}.get) == ["/usr/bin/python3"]
     assert default_interpreters(lambda _: None) == []
+
+
+def test_diagnose_attaches_the_findings_of_the_builtin_rules() -> None:
+    snapshot = inspect_host(
+        FakeRunner(), which=lambda _: None, environ={}, toolkit_roots=(), host=lambda: HOST
+    )
+    diagnosed = diagnose(snapshot)
+    assert [f.id for f in diagnosed.findings][:3] == ["GSI-SYS-001", "GSI-SYS-002", "GSI-SYS-003"]
+    assert diagnosed.nvidia == snapshot.nvidia

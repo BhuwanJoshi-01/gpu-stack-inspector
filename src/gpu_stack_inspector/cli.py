@@ -19,6 +19,7 @@ from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
 from gpu_stack_inspector.reports.json_report import render_json
 from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.rules.engine import RuleContext
 from gpu_stack_inspector.runner import SubprocessRunner
 
 HELP = (
@@ -84,10 +85,14 @@ def inspect(
     Interpreters are inspected from their metadata only; nothing is imported into
     them beyond the standard library.
     """
-    pythons = python or orchestrator.default_interpreters()
+    shell_python = next(iter(orchestrator.default_interpreters()), None)
+    pythons = python or ([shell_python] if shell_python else [])
     if not pythons:
         typer.echo("No python found on PATH; name interpreters with --python.", err=True)
-    snapshot = orchestrator.inspect(SubprocessRunner(), pythons)
+    snapshot = orchestrator.diagnose(
+        orchestrator.inspect(SubprocessRunner(), pythons),
+        RuleContext(shell_python=shell_python),
+    )
     redacted = Redactor(RedactionContext.current()).redact(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
