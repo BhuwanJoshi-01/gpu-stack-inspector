@@ -53,6 +53,8 @@ select = [
 known-first-party = ["gpu_stack_inspector", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
+# Runs inside target interpreters as old as Python 3.8: no modern syntax upgrades.
+"src/gpu_stack_inspector/probes/*_program.py" = ["UP", "PTH"]
 "tests/**" = [
     "S101",  # assert is how pytest works
     "S105", "S106",  # fake secrets are the point of the redaction tests
