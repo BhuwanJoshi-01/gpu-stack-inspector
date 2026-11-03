@@ -36,6 +36,14 @@ explicitly given Python interpreters.
   version, build and location, every GPU-relevant package; `--all` for every
   field), then the findings, including GSI-DIFF-001 when the environments have
   different PyTorch builds. JSON output has the rows with a `differs` flag.
+- `report [--python …] [--format markdown|json] [--output FILE] [--force]` makes a
+  redacted report to paste into a bug tracker: a Markdown dossier (summary of
+  problems, system, environments, differences, findings, what could not be
+  checked) or the JSON document. It prints by default so it can be read first;
+  `--output` writes only that file and never overwrites one without `--force`.
+- JSON output follows `docs/json-schema-v1.json`, checked by contract tests, and
+  records what redaction removed (`redactions`); terminal reports end with the
+  same information.
 - `rules list` and `rules explain CODE` document every check.
 - `gpu-stack-inspector --help` and `--version`. Exit codes: 0 when the
   inspection ran (whatever it found), 1 for `--strict` failures, 2 for usage

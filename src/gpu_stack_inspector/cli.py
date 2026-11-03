@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import sys
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -20,7 +21,8 @@ from gpu_stack_inspector.exit_codes import ExitCode
 from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor, redact_snapshot
 from gpu_stack_inspector.reports.json_report import render_json
-from gpu_stack_inspector.reports.terminal import render_compare, render_terminal
+from gpu_stack_inspector.reports.markdown import render_markdown
+from gpu_stack_inspector.reports.terminal import redaction_line, render_compare, render_terminal
 from gpu_stack_inspector.rules.catalog import builtin_rules
 from gpu_stack_inspector.rules.engine import RuleContext
 from gpu_stack_inspector.runner import SubprocessRunner
@@ -129,14 +131,7 @@ def inspect(
     Interpreters are inspected from their metadata only; nothing is imported into
     them beyond the standard library.
     """
-    shell_python = next(iter(orchestrator.default_interpreters()), None)
-    pythons = python or ([shell_python] if shell_python else [])
-    if not pythons:
-        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
-    snapshot = orchestrator.diagnose(
-        orchestrator.inspect(SubprocessRunner(), pythons),
-        RuleContext(shell_python=shell_python),
-    )
+    snapshot = _collect(python, compare=False)
     redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
@@ -170,13 +165,7 @@ def compare(
     """
     if len(python) < 2:
         raise typer.BadParameter("give --python at least twice", param_hint="--python")
-    shell_python = next(iter(orchestrator.default_interpreters()), None)
-    snapshot = orchestrator.with_comparison(
-        orchestrator.diagnose(
-            orchestrator.inspect(SubprocessRunner(), python),
-            RuleContext(shell_python=shell_python),
-        )
-    )
+    snapshot = _collect(python, compare=True)
     redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
@@ -184,6 +173,81 @@ def compare(
         render_compare(redacted, Console(), show_all=show_all)
     if _unusable_interpreters(snapshot):
         raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+class ReportFormat(StrEnum):
+    MARKDOWN = "markdown"
+    JSON = "json"
+
+
+@app.command()
+def report(
+    python: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--python",
+            "-p",
+            metavar="PATH",
+            help=(
+                "Interpreter to include. Repeat it to compare several. Default: the python on PATH."
+            ),
+        ),
+    ] = None,
+    report_format: Annotated[
+        ReportFormat, typer.Option("--format", "-f", help="Report format.")
+    ] = ReportFormat.MARKDOWN,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            metavar="FILE",
+            help="Write the report to FILE instead of printing it ('-' prints).",
+        ),
+    ] = None,
+    force: Annotated[bool, typer.Option("--force", help="Overwrite FILE if it exists.")] = False,
+) -> None:
+    """Write a redacted report to paste into a bug tracker.
+
+    By default the report is printed, so it can be read before it is shared. With two or
+    more interpreters it includes their comparison. The file named with --output is the
+    only thing this tool ever writes.
+    """
+    to_file = output is not None and str(output) != "-"
+    if to_file and output is not None and output.exists() and not force:
+        typer.echo(f"{output} exists; use --force to overwrite it.", err=True)
+        raise typer.Exit(ExitCode.ERROR)
+    snapshot = _collect(python, compare=len(python or []) >= 2)
+    redacted = redact_snapshot(snapshot)
+    if report_format is ReportFormat.JSON:
+        rendered = render_json(redacted)
+    else:
+        rendered = render_markdown(redacted)
+    if to_file and output is not None:
+        output.write_text(rendered, encoding="utf-8")
+        note = redaction_line(redacted) or "Nothing needed redacting"
+        typer.echo(f"Wrote {output}. {note}. Read it before you share it.", err=True)
+    else:
+        typer.echo(rendered, nl=False)
+    if _unusable_interpreters(snapshot):
+        raise typer.Exit(ExitCode.CONTEXT_UNAVAILABLE)
+
+
+def _collect(python: list[str] | None, *, compare: bool) -> Snapshot:
+    """Inspect, run every check and, if asked, compare: the shared part of each command.
+
+    Without interpreters the python on PATH is used; the shell's python also goes into the
+    rule context.
+    """
+    shell_python = next(iter(orchestrator.default_interpreters()), None)
+    pythons = python or ([shell_python] if shell_python else [])
+    if not pythons:
+        typer.echo("No python found on PATH; name interpreters with --python.", err=True)
+    snapshot = orchestrator.diagnose(
+        orchestrator.inspect(SubprocessRunner(), pythons),
+        RuleContext(shell_python=shell_python),
+    )
+    return orchestrator.with_comparison(snapshot) if compare else snapshot
 
 
 _UNUSABLE = frozenset({FailureKind.NOT_FOUND, FailureKind.PERMISSION_DENIED})
