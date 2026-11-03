@@ -23,6 +23,15 @@ explicitly given Python interpreters.
   `torch/version.py` read as text, the CUDA libraries in `torch/lib`, the
   nvidia-* requirements, and conda's package records. JSON output has it as
   `torch_build`.
+- `inspect` runs 11 checks and lists their findings per host and interpreter:
+  driver tools, driver, GPUs, `CUDA_VISIBLE_DEVICES` (GSI-SYS-001…003,
+  GSI-ENV-003), each interpreter and whether it is the shell's python
+  (GSI-ENV-001, 002), PyTorch installed and a CUDA build (GSI-TORCH-001, 002),
+  and nvcc and the driver against the CUDA versions in use (GSI-CUDA-001…003,
+  with dated, source-tagged NVIDIA compatibility data). Problems say what to do
+  next and how to check it; a consequence of another finding says which one it
+  follows from. Findings are in the JSON output too.
+- `rules list` and `rules explain CODE` document every check.
 - `gpu-stack-inspector --help` and `--version`. Exit codes: 0 when the
   inspection ran (whatever it found), 1 for `--strict` failures, 2 for usage
   errors and internal errors, 3 when required context is missing, 130 for

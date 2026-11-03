@@ -12,6 +12,8 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
 from gpu_stack_inspector import __version__, orchestrator
 from gpu_stack_inspector.exit_codes import ExitCode
@@ -19,6 +21,8 @@ from gpu_stack_inspector.models import FailureKind, Snapshot
 from gpu_stack_inspector.privacy import RedactionContext, Redactor
 from gpu_stack_inspector.reports.json_report import render_json
 from gpu_stack_inspector.reports.terminal import render_terminal
+from gpu_stack_inspector.rules.catalog import builtin_rules
+from gpu_stack_inspector.rules.engine import RuleContext
 from gpu_stack_inspector.runner import SubprocessRunner
 
 HELP = (
@@ -56,6 +60,47 @@ def cli(
     """Global options (the help text comes from HELP)."""
 
 
+rules_app = typer.Typer(
+    help="List the checks and explain what each one looks at.", no_args_is_help=True
+)
+app.add_typer(rules_app, name="rules")
+
+
+@rules_app.command("list")
+def rules_list() -> None:
+    """List every check with its code."""
+    table = Table(box=None, pad_edge=False, show_edge=False)
+    table.add_column("Code", no_wrap=True)
+    table.add_column("Check")
+    for rule in builtin_rules():
+        table.add_row(Text(rule.id), Text(rule.title))
+    Console().print(table)
+
+
+@rules_app.command("explain")
+def rules_explain(
+    code: Annotated[
+        str, typer.Argument(metavar="CODE", help="A finding code, e.g. GSI-TORCH-002.")
+    ],
+) -> None:
+    """Explain what a check looks at, how it decides, and its sources."""
+    rule = builtin_rules().get(code.strip())
+    if rule is None:
+        typer.echo(
+            f"Unknown code {code}; `gpu-stack-inspector rules list` shows them all.", err=True
+        )
+        raise typer.Exit(ExitCode.ERROR)
+    console = Console()
+    console.print(Text(f"{rule.id}  {rule.title}", style="bold"))
+    console.print()
+    console.print(Text(rule.explanation))
+    if rule.sources:
+        console.print()
+        console.print(Text("Sources:", style="bold"))
+        for source in rule.sources:
+            console.print(Text(f"  {source}"))
+
+
 class OutputFormat(StrEnum):
     TEXT = "text"
     JSON = "json"
@@ -84,10 +129,14 @@ def inspect(
     Interpreters are inspected from their metadata only; nothing is imported into
     them beyond the standard library.
     """
-    pythons = python or orchestrator.default_interpreters()
+    shell_python = next(iter(orchestrator.default_interpreters()), None)
+    pythons = python or ([shell_python] if shell_python else [])
     if not pythons:
         typer.echo("No python found on PATH; name interpreters with --python.", err=True)
-    snapshot = orchestrator.inspect(SubprocessRunner(), pythons)
+    snapshot = orchestrator.diagnose(
+        orchestrator.inspect(SubprocessRunner(), pythons),
+        RuleContext(shell_python=shell_python),
+    )
     redacted = Redactor(RedactionContext.current()).redact(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)

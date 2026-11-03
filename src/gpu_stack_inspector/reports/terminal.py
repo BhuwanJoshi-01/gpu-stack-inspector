@@ -6,14 +6,19 @@ name containing ``[bold]`` is printed as it is instead of being interpreted.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
 from gpu_stack_inspector.models import (
+    Finding,
     HostFacts,
     InterpreterFacts,
     NvidiaFacts,
     Snapshot,
+    Status,
     ToolkitFacts,
 )
 from gpu_stack_inspector.rules.torch_build import TorchBuild, TorchBuildKind, classify_torch
@@ -39,6 +44,8 @@ def render_terminal(snapshot: Snapshot, console: Console) -> None:
         console.print()
         console.print(Text.assemble((f"{interpreter.label:<3}", "bold"), interpreter.path))
         console.print(Text("   " + _interpreter(interpreter)))
+    if snapshot.findings:
+        _render_findings(snapshot, console)
     if snapshot.probe_failures:
         console.print()
         console.print(Text("Could not check:", style="bold"))
@@ -137,3 +144,72 @@ def _build(build: TorchBuild) -> str:
     elif build.kind is not TorchBuildKind.UNKNOWN and build.confidence.value != "high":
         text += f", {build.confidence.value} confidence"
     return text
+
+
+_LABELS = {
+    Status.FAIL: ("FAIL", "bold red"),
+    Status.WARN: ("WARN", "yellow"),
+    Status.UNKNOWN: ("UNKNOWN", "magenta"),
+    Status.PASS: ("PASS", "green"),
+    Status.NOT_APPLICABLE: ("N/A", "dim"),
+    Status.NOT_TESTED: ("NOT TESTED", "dim"),
+}
+_PROBLEMS = frozenset({Status.FAIL, Status.WARN, Status.UNKNOWN})
+
+
+def _render_findings(snapshot: Snapshot, console: Console) -> None:
+    """Findings per subject (host, then each interpreter) in evaluation order.
+
+    Problems show their reason, the next step and how to check it; consequences of a
+    root cause are dimmed and say which finding they follow from.
+    """
+    paths = {interpreter.label: interpreter.path for interpreter in snapshot.interpreters}
+    subjects = ["host", *paths]
+    console.print()
+    console.print(Text("Findings", style="bold"))
+    for subject in subjects:
+        group = [f for f in snapshot.findings if f.subject == subject]
+        if not group:
+            continue
+        heading = "Host" if subject == "host" else f"{subject}  {paths[subject]}"
+        console.print(Text(heading, style="bold"))
+        table = Table.grid(padding=(0, 1))
+        table.add_column(width=10, no_wrap=True)
+        table.add_column(width=13, no_wrap=True)  # GSI-TORCH-002 is the longest code
+        # Fold, never crop: people copy the commands and paths shown here.
+        table.add_column(overflow="fold")
+        for finding in group:
+            _add_finding(table, finding)
+        console.print(table)
+    console.print(Text(_tally(snapshot.findings)))
+
+
+def _add_finding(table: Table, finding: Finding) -> None:
+    label, style = _LABELS[finding.status]
+    summary = finding.summary
+    if finding.caused_by:
+        summary += f" (follows from {finding.caused_by})"
+        style = "dim"
+    table.add_row(Text(label, style=style), Text(finding.id, style="dim"), Text(summary))
+    if finding.status not in _PROBLEMS:
+        return
+    details = [finding.reason]
+    if finding.recommended_action:
+        details.append(f"Next:  {finding.recommended_action}")
+    if finding.verify_command:
+        details.append(f"Check: {finding.verify_command}")
+    details.extend(f"Note:  {limitation}" for limitation in finding.limitations)
+    for detail in details:
+        table.add_row(Text(""), Text(""), Text(detail))
+
+
+def _tally(findings: tuple[Finding, ...]) -> str:
+    counts = Counter(f.status for f in findings)
+    parts = [
+        f"{counts[Status.FAIL]} failed",
+        f"{counts[Status.WARN]} warning{'' if counts[Status.WARN] == 1 else 's'}",
+        f"{counts[Status.UNKNOWN]} unknown",
+        f"{counts[Status.PASS]} passed",
+        f"{counts[Status.NOT_APPLICABLE] + counts[Status.NOT_TESTED]} not applicable or not tested",
+    ]
+    return "Summary: " + " · ".join(parts)

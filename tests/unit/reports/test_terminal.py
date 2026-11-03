@@ -1,16 +1,20 @@
 from rich.console import Console
 
 from gpu_stack_inspector.models import (
+    Confidence,
     CudaToolkit,
     Distribution,
     EnvironmentVariable,
     FailureKind,
+    Finding,
     GpuDevice,
     HostFacts,
     InterpreterFacts,
     NvidiaFacts,
     ProbeFailure,
+    Severity,
     Snapshot,
+    Status,
     ToolkitFacts,
     TorchFacts,
 )
@@ -131,3 +135,65 @@ def test_rocm_is_named_but_not_judged() -> None:
 
 def test_without_torch_evidence_it_says_no_torch() -> None:
     assert "no torch" in _interpreter_line(None)
+
+
+def _finding(
+    rule: str, status: Status, summary: str, subject: str = "host", **fields: object
+) -> Finding:
+    return Finding(
+        id=rule, status=status, severity=Severity.HIGH, confidence=Confidence.HIGH,
+        summary=summary, reason="the reason", subject=subject, **fields,  # type: ignore[arg-type]
+    )  # fmt: skip
+
+
+def test_findings_are_grouped_by_subject_with_details_for_problems() -> None:
+    snapshot = Snapshot(
+        "0.1.0",
+        "t",
+        interpreters=(InterpreterFacts("A", "~/envs/a/bin/python", version="3.12.0"),),
+        findings=(
+            _finding("GSI-SYS-001", Status.WARN, "nvidia-smi was not found",
+                     recommended_action="Install the driver", verify_command="nvidia-smi"),
+            _finding("GSI-SYS-002", Status.NOT_TESTED, "The NVIDIA driver was not checked",
+                     caused_by="GSI-SYS-001"),
+            _finding("GSI-TORCH-002", Status.FAIL, "torch 2.15.0+cpu is a CPU-only build", "A",
+                     limitations=("only metadata was read",)),
+            _finding("GSI-ENV-001", Status.PASS, "Python 3.12.0 (cpython)", "A"),
+        ),
+    )  # fmt: skip
+    lines = [" ".join(line.split()) for line in render(snapshot).splitlines()]
+    text = "\n".join(lines)
+    assert "Findings" in lines
+    assert "Host" in lines
+    assert "WARN GSI-SYS-001 nvidia-smi was not found" in text
+    assert "Next: Install the driver" in text
+    assert "Check: nvidia-smi" in text
+    assert (
+        "NOT TESTED GSI-SYS-002 The NVIDIA driver was not checked (follows from GSI-SYS-001)"
+        in text
+    )
+    assert "A ~/envs/a/bin/python" in lines
+    assert "FAIL GSI-TORCH-002 torch 2.15.0+cpu is a CPU-only build" in text
+    assert "Note: only metadata was read" in text
+    assert "PASS GSI-ENV-001 Python 3.12.0 (cpython)" in text
+    assert text.count("the reason") == 2  # passes and consequences get no details
+    assert (
+        "Summary: 1 failed · 1 warning · 0 unknown · 1 passed · 1 not applicable or not tested"
+        in text
+    )
+
+
+def test_no_findings_section_without_findings() -> None:
+    assert "Findings" not in render(Snapshot("0.1.0", "t"))
+
+
+def test_long_commands_are_folded_not_cut_off() -> None:
+    path = "/very/long/" + "directory-name/" * 12 + "bin/python"
+    finding = _finding(
+        "GSI-TORCH-002", Status.FAIL, "CPU-only build", verify_command=f"inspect --python {path}"
+    )
+    console = Console(record=True, width=80, color_system=None)
+    render_terminal(Snapshot("0.1.0", "t", findings=(finding,)), console)
+    text = console.export_text()
+    assert "…" not in text
+    assert "".join(text.split()).count("directory-name/") == 12

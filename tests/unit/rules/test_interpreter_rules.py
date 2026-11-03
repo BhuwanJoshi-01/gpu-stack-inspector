@@ -198,3 +198,9 @@ def test_conflicting_evidence_is_unknown_with_a_reinstall_hint() -> None:
 def test_no_build_check_without_torch() -> None:
     snapshot = Snapshot("0.1.0", "t", interpreters=(HEALTHY,))
     assert [f for f in evaluate(snapshot, builtin_rules()) if f.id == "GSI-TORCH-002"] == []
+
+
+def test_comparing_several_interpreters_is_not_second_guessed() -> None:
+    other = InterpreterFacts("B", "/envs/b/bin/python", version="3.11.0")
+    context = RuleContext(shell_python="/usr/bin/python3")
+    assert results(HEALTHY, other, rule="GSI-ENV-002", context=context) == []

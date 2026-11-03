@@ -47,6 +47,7 @@ def requested(monkeypatch: pytest.MonkeyPatch) -> list[Sequence[str]]:
         return CANNED
 
     monkeypatch.setattr(orchestrator, "inspect", fake_inspect)
+    monkeypatch.setattr(orchestrator, "default_interpreters", lambda: ["/usr/bin/python3"])
     monkeypatch.setattr(
         RedactionContext,
         "current",
