@@ -126,6 +126,14 @@ def utc_timestamp() -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class RedactionCount:
+    """How many values of one kind (``home_path``, ``secret_value``…) were redacted."""
+
+    kind: str
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
 class Snapshot:
     """Everything one run observed and concluded; the input of every renderer.
 
@@ -145,6 +153,8 @@ class Snapshot:
     """Field-by-field differences between the interpreters, when they were compared."""
     probe_failures: tuple[ProbeFailure, ...] = ()
     findings: tuple[Finding, ...] = ()
+    redactions: tuple[RedactionCount, ...] = ()
+    """What redaction removed before this snapshot was output; empty if nothing was."""
 
 
 @dataclass(frozen=True, slots=True)

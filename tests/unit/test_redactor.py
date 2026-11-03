@@ -240,3 +240,18 @@ def test_a_name_ending_a_sentence_is_hidden_but_not_one_inside_a_domain() -> Non
 )
 def test_a_secret_inside_the_value_of_a_harmless_name_is_still_found(raw: str, clean: str) -> None:
     assert text(raw) == clean
+
+
+def test_redacting_a_snapshot_records_what_was_removed() -> None:
+    from gpu_stack_inspector.models import InterpreterFacts, RedactionCount, Snapshot
+    from gpu_stack_inspector.privacy import RedactionContext, redact_snapshot
+
+    snapshot = Snapshot(
+        "0.1.0",
+        "t",
+        interpreters=(InterpreterFacts("A", "/home/alice/a/python", prefix="/home/alice/a"),),
+    )
+    redacted = redact_snapshot(snapshot, RedactionContext("/home/alice", "alice", None))
+    assert redacted.interpreters[0].path == "~/a/python"
+    assert redacted.redactions == (RedactionCount("home_path", 2),)
+    assert snapshot.redactions == ()

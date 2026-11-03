@@ -93,6 +93,7 @@ SCHEMA_DEFS = {
     models.Finding: SCHEMA["$defs"]["finding"],
     models.Evidence: SCHEMA["$defs"]["evidence"],
     TorchBuild: SCHEMA["$defs"]["torch_build"],
+    models.RedactionCount: SCHEMA["$defs"]["redaction_count"],
 }
 DERIVED = {
     models.InterpreterFacts: {"virtualenv", "torch_build"},
@@ -107,3 +108,19 @@ def test_every_model_field_is_in_the_schema_and_nothing_else(model: type) -> Non
     assert set(schema["properties"]) == fields
     assert set(schema["required"]) == fields
     assert schema["additionalProperties"] is False
+
+
+def test_redacted_output_with_its_redaction_record_matches_the_schema() -> None:
+    from gpu_stack_inspector.privacy import RedactionContext, redact_snapshot
+
+    snapshot = dataclasses.replace(
+        real_laptop_snapshot(),
+        interpreters=(
+            *real_laptop_snapshot().interpreters,
+            models.InterpreterFacts("D", "/home/alice/envs/d/bin/python"),
+        ),
+    )
+    redacted = redact_snapshot(snapshot, RedactionContext("/home/alice", "alice", None))
+    document = json.loads(render_json(redacted))
+    assert validate(document) == []
+    assert {"kind": "home_path", "count": 1} in document["redactions"]

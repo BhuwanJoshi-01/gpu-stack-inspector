@@ -14,7 +14,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+if TYPE_CHECKING:
+    from gpu_stack_inspector.models import Snapshot
 
 T = TypeVar("T")
 
@@ -222,3 +225,13 @@ class Redactor:
                 self._counts["secret_value"] += 1
         parts.append(text[pos:])
         return "".join(parts)
+
+
+def redact_snapshot(snapshot: Snapshot, context: RedactionContext | None = None) -> Snapshot:
+    """The snapshot redacted for output, with a record of what was removed."""
+    from gpu_stack_inspector.models import RedactionCount
+
+    redactor = Redactor(context or RedactionContext.current())
+    redacted = redactor.redact(snapshot)
+    counts = tuple(RedactionCount(kind, n) for kind, n in sorted(redactor.summary.items()))
+    return replace(redacted, redactions=counts)

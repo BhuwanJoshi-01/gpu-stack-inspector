@@ -16,7 +16,8 @@
     "interpreters",
     "comparison",
     "probe_failures",
-    "findings"
+    "findings",
+    "redactions"
   ],
   "properties": {
     "schema_version": {
@@ -87,6 +88,12 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/finding"
+      }
+    },
+    "redactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/redaction_count"
       }
     }
   },
@@ -706,6 +713,23 @@
               "pattern": "^GSI-[A-Z]+-[0-9]{3}$"
             }
           ]
+        }
+      }
+    },
+    "redaction_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "count"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }
