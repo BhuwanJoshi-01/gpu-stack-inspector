@@ -1,0 +1,17 @@
+[project]
+name = "gpu-stack-inspector"
+version = "0.1.0"
+description = "Explain why your AI code uses the GPU in one Python environment but not another."
+readme = "README.md"
+authors = [
+    { name = "BhuwanJoshi-01", email = "bhuwanj779@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+gpu-stack-inspector = "gpu_stack_inspector:main"
+
+[build-system]
+requires = ["uv_build>=0.11.29,<0.12.0"]
+build-backend = "uv_build"
