@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from gpu_stack_inspector.models import (
+    Distribution,
     FailureKind,
     Finding,
     InterpreterFacts,
     ProbeFailure,
     Snapshot,
     Status,
+    TorchFacts,
 )
 from gpu_stack_inspector.rules.catalog import builtin_rules
 from gpu_stack_inspector.rules.engine import RuleContext, evaluate
@@ -103,3 +107,29 @@ def test_nothing_is_noted_when_the_shell_python_is_unknown_or_the_interpreter_un
         results(missing, rule="GSI-ENV-002", context=RuleContext(shell_python="/usr/bin/python3"))
         == []
     )
+
+
+def with_torch(version: str = "2.11.0+cu128", **fields: object) -> InterpreterFacts:
+    torch = TorchFacts(version=version, location="/envs/a/lib/site-packages", **fields)  # type: ignore[arg-type]
+    return replace(HEALTHY, torch=torch)
+
+
+def test_installed_torch_passes() -> None:
+    [result] = results(with_torch(), rule="GSI-TORCH-001")
+    assert result.status is Status.PASS
+    assert result.summary == "torch 2.11.0+cu128 is installed"
+
+
+def test_missing_torch_with_packages_that_need_it_warns() -> None:
+    env = replace(
+        HEALTHY, distributions=(Distribution("accelerate", "1.13.0"), Distribution("numpy", "2.4"))
+    )
+    [result] = results(env, rule="GSI-TORCH-001")
+    assert result.status is Status.WARN
+    assert result.reason == "accelerate cannot work without torch."
+    assert "pytorch.org" in (result.recommended_action or "")
+
+
+def test_an_environment_simply_without_torch_is_not_applicable() -> None:
+    [result] = results(HEALTHY, rule="GSI-TORCH-001")
+    assert result.status is Status.NOT_APPLICABLE

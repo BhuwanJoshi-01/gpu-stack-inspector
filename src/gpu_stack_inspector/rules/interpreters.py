@@ -127,3 +127,64 @@ def shell_interpreter(snapshot: Snapshot, context: RuleContext) -> Iterator[Find
                 "environment in different directories are reported as different.",
             ),
         )
+
+
+# Installed packages that cannot work without torch.
+TORCH_DEPENDENTS = frozenset(
+    {"torchvision", "torchaudio", "xformers", "flash-attn", "bitsandbytes", "accelerate",
+     "deepspeed", "vllm"}
+)  # fmt: skip
+
+
+@RULES.rule("GSI-TORCH-001", "PyTorch is installed")
+def torch_installed(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether the interpreter has PyTorch, and whether it needs it.
+
+    An environment without torch is only a problem when it contains packages that need
+    it (accelerate, bitsandbytes, torchvision…): then the environment is incomplete.
+    Otherwise the PyTorch checks do not apply to it.
+    """
+    for interpreter in snapshot.interpreters:
+        if not _usable(interpreter):
+            continue
+        if interpreter.torch is not None:
+            yield Finding(
+                id="GSI-TORCH-001",
+                status=Status.PASS,
+                severity=Severity.INFO,
+                confidence=Confidence.HIGH,
+                summary=f"torch {interpreter.torch.version} is installed",
+                reason=f"Found in {interpreter.torch.location or 'an unknown location'}.",
+                subject=interpreter.label,
+                evidence=(Evidence("python-metadata", "torch", interpreter.torch.version),),
+            )
+            continue
+        dependents = sorted(d.name for d in interpreter.distributions if d.name in TORCH_DEPENDENTS)
+        if dependents:
+            yield Finding(
+                id="GSI-TORCH-001",
+                status=Status.WARN,
+                severity=Severity.MEDIUM,
+                confidence=Confidence.HIGH,
+                summary="PyTorch is missing, but packages that need it are installed",
+                reason=f"{', '.join(dependents)} cannot work without torch.",
+                subject=interpreter.label,
+                evidence=tuple(
+                    Evidence("python-metadata", name, "installed") for name in dependents
+                ),
+                recommended_action=(
+                    "Install PyTorch with the selector at https://pytorch.org/get-started/locally/"
+                    ", choosing a CUDA version the driver supports."
+                ),
+                verify_command=f"gpu-stack-inspector inspect --python {interpreter.path}",
+            )
+        else:
+            yield Finding(
+                id="GSI-TORCH-001",
+                status=Status.NOT_APPLICABLE,
+                severity=Severity.INFO,
+                confidence=Confidence.HIGH,
+                summary="No PyTorch in this environment",
+                reason="Nothing installed here needs it, so the PyTorch checks do not apply.",
+                subject=interpreter.label,
+            )
