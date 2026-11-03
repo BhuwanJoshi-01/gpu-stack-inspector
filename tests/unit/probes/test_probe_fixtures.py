@@ -14,6 +14,11 @@ def parse(env: str) -> InterpreterFacts:
     return parse_probe_output("A", f"~/miniconda3/envs/{env}/bin/python", stdout)
 
 
+def parse_cpu_venv() -> InterpreterFacts:
+    stdout = read_fixture("probe", "venv-cpu-torch.stdout.txt")
+    return parse_probe_output("A", "cpu-torch-env/bin/python", stdout)
+
+
 def versions(facts: InterpreterFacts) -> dict[str, str]:
     return {d.name: d.version for d in facts.distributions}
 
@@ -94,3 +99,15 @@ def test_torch_evidence_of_a_conda_cuda_build() -> None:
 @pytest.mark.parametrize("env", ["base", "dwpose"])
 def test_environments_without_torch_have_no_torch_evidence(env: str) -> None:
     assert parse(env).torch is None
+
+
+def test_a_cpu_only_venv_is_a_venv_with_a_cpu_tagged_torch() -> None:
+    facts = parse_cpu_venv()
+    assert facts.failures == ()
+    assert facts.virtualenv is True
+    assert facts.conda is False
+    assert facts.torch is not None
+    assert facts.torch.version == "2.15.0+cpu"
+    assert facts.torch.cuda_library is False
+    assert (facts.torch.version_py_found, facts.torch.built_cuda) == (True, None)
+    assert nvidia_wheels(facts) == 0
