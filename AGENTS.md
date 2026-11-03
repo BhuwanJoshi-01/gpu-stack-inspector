@@ -16,6 +16,7 @@ uv run pytest -q --cov                     # with coverage
 GSI_INTEGRATION=1 uv run pytest -q tests/integration   # against this machine's GPU/driver
 GSI_TEST_PYTHONS="$(uv python find --no-project 3.9):$HOME/env/bin/python" uv run pytest -q tests/integration
                                                        # probe inside other interpreters (CI: 3.8-3.10, PyPy)
+GSI_RUNTIME_PYTHONS="$HOME/env/bin/python" uv run pytest -q tests/integration   # imports torch, uses the GPU
 HYPOTHESIS_PROFILE=thorough uv run pytest -q           # property tests with 2000 examples
 ```
 
@@ -33,7 +34,13 @@ src/gpu_stack_inspector/
                   assembles the Snapshot (no diagnosis); default_interpreters()
   probes/         metadata_program.py: runs INSIDE target interpreters (Python 3.8+, stdlib only,
                   never imports target packages, prints one JSON doc between markers);
-                  metadata_probe.py: runs it in an empty temp cwd and parses the answer defensively
+                  metadata_probe.py: runs it in an empty temp cwd and parses the answer defensively;
+                  runtime_program.py + runtime_probe.py: the ONLY code that imports torch, only via
+                  `probe --runtime` (orchestrator.inspect(runtime=True))
+  rules/          engine.py (registry, evaluate), catalog.py (module order), host.py,
+                  interpreters.py, compatibility.py, differences.py, torch_build.py (classifier),
+                  comparison.py (field-by-field rows)
+  compatibility/  data.json (dated, source-tagged NVIDIA data) + loader.py, versions.py
   reports/        json_report.py, terminal.py (plain Text, never Rich markup from collected data)
   collectors/     host.py (OS, distro, WSL flag), nvidia.py (nvidia-smi query, --version, table
                   header fallback), toolkit.py (nvcc, /usr/local/cuda*, /opt/cuda*, CUDA_HOME…),

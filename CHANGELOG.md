@@ -44,6 +44,13 @@ explicitly given Python interpreters.
 - JSON output follows `docs/json-schema-v1.json`, checked by contract tests, and
   records what redaction removed (`redactions`); terminal reports end with the
   same information.
+- `probe --runtime [--python …]` proves CUDA works: it imports torch in each
+  interpreter and runs a tiny CUDA operation (16 floats), step by step, and
+  GSI-TORCH-003 reports where it broke (import, availability, devices, the
+  operation, or a crash or hang, named from the exit status). Without
+  `--runtime` it runs nothing and explains why it asks. Every other command
+  stays metadata-only; for CUDA builds they say "not tested" (GSI-TORCH-004)
+  instead of implying CUDA works.
 - `rules list` and `rules explain CODE` document every check.
 - `gpu-stack-inspector --help` and `--version`. Exit codes: 0 when the
   inspection ran (whatever it found), 1 for `--strict` failures, 2 for usage
