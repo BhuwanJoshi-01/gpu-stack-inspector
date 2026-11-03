@@ -9,8 +9,10 @@ from typing import Any
 import pytest
 from hypothesis import settings
 
-# HYPOTHESIS_PROFILE=thorough runs the property tests with many more examples.
-settings.register_profile("thorough", max_examples=2000)
+# Per-example deadlines measure the machine, not the code: shared CI runners (Windows
+# especially) are slow at times. HYPOTHESIS_PROFILE=thorough runs many more examples.
+settings.register_profile("default", deadline=None)
+settings.register_profile("thorough", deadline=None, max_examples=2000)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 _LOCAL_FAMILIES = {getattr(socket, "AF_UNIX", None)} - {None}
