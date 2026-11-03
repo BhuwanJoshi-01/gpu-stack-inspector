@@ -130,3 +130,18 @@ class Snapshot:
     schema_version: int = SCHEMA_VERSION
     probe_failures: tuple[ProbeFailure, ...] = ()
     findings: tuple[Finding, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class HostFacts:
+    """The operating system the inspection ran on."""
+
+    system: str
+    """``platform.system()``: ``Linux``, ``Windows``, ``Darwin``…"""
+    machine: str
+    """CPU architecture as the OS reports it: ``x86_64``, ``AMD64``, ``aarch64``…"""
+    kernel: str | None
+    distribution: str | None = None
+    """``PRETTY_NAME`` from os-release on Linux, e.g. ``Ubuntu 26.04.1 LTS``."""
+    wsl: bool = False
+    """Running inside Windows Subsystem for Linux (a fact only; WSL is not validated yet)."""
