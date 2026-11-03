@@ -1,0 +1,713 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/json-schema-v1.json",
+  "title": "GPU Stack Inspector report, schema version 1",
+  "description": "Output of `inspect`, `compare` and `report` with --format json. Unknown facts are null; paths, user and host names and secrets are redacted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool_version",
+    "created_at",
+    "host",
+    "nvidia",
+    "toolkit",
+    "cuda_environment",
+    "interpreters",
+    "comparison",
+    "probe_failures",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "host": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/host"
+        }
+      ]
+    },
+    "nvidia": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/nvidia"
+        }
+      ]
+    },
+    "toolkit": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/toolkit"
+        }
+      ]
+    },
+    "cuda_environment": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/environment_variable"
+      }
+    },
+    "interpreters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/interpreter"
+      }
+    },
+    "comparison": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/comparison_row"
+      }
+    },
+    "probe_failures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/probe_failure"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "key",
+        "value"
+      ],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "probe_failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe",
+        "kind",
+        "detail"
+      ],
+      "properties": {
+        "probe": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "not_found",
+            "permission_denied",
+            "timeout",
+            "nonzero_exit",
+            "malformed_output",
+            "os_error",
+            "probe_error"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "machine",
+        "kernel",
+        "distribution",
+        "wsl"
+      ],
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "distribution": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wsl": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "name",
+        "memory_total_mib",
+        "compute_capability"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "memory_total_mib": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "compute_capability": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "nvidia": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "smi_path",
+        "driver_version",
+        "max_cuda_version",
+        "gpus",
+        "failures"
+      ],
+      "properties": {
+        "smi_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "driver_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_cuda_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gpus": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gpu"
+          }
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/probe_failure"
+          }
+        }
+      }
+    },
+    "cuda_toolkit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "version",
+        "version_source",
+        "linked_from"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "linked_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "toolkit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nvcc_path",
+        "nvcc_version",
+        "toolkits",
+        "failures"
+      ],
+      "properties": {
+        "nvcc_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nvcc_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolkits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cuda_toolkit"
+          }
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/probe_failure"
+          }
+        }
+      }
+    },
+    "environment_variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "location"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "location": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "torch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "location",
+        "requires_nvidia",
+        "cuda_library",
+        "hip_library",
+        "version_py_found",
+        "built_cuda",
+        "built_hip",
+        "conda_records"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "location": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requires_nvidia": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cuda_library": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hip_library": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "version_py_found": {
+          "type": "boolean"
+        },
+        "built_cuda": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "built_hip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conda_records": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "torch_build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "confidence",
+        "cuda_version",
+        "evidence",
+        "conflicts"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "missing",
+            "cuda",
+            "cpu",
+            "rocm",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "cuda_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "interpreter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "path",
+        "executable",
+        "version",
+        "implementation",
+        "prefix",
+        "base_prefix",
+        "conda",
+        "platform",
+        "user_site",
+        "pythonpath_set",
+        "distributions",
+        "torch",
+        "failures",
+        "virtualenv",
+        "torch_build"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "executable": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "implementation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "base_prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conda": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "platform": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_site": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "pythonpath_set": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "distributions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/distribution"
+          }
+        },
+        "torch": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/torch"
+            }
+          ]
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/probe_failure"
+          }
+        },
+        "virtualenv": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "torch_build": {
+          "$ref": "#/$defs/torch_build"
+        }
+      }
+    },
+    "comparison_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "values",
+        "differs"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "differs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "confidence": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "severity",
+        "confidence",
+        "summary",
+        "reason",
+        "subject",
+        "evidence",
+        "recommended_action",
+        "verify_command",
+        "limitations",
+        "caused_by"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^GSI-[A-Z]+-[0-9]{3}$"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail",
+            "unknown",
+            "not_applicable",
+            "not_tested"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "recommended_action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verify_command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "caused_by": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^GSI-[A-Z]+-[0-9]{3}$"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
