@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -78,3 +79,35 @@ def test_a_json_report_matches_the_inspect_json(
     assert data["comparison"]
     assert [item["kind"] for item in data["redactions"]] == ["home_path"]
     assert "/home/alice" not in json.dumps(data)
+
+
+def test_output_writes_only_the_named_file(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    target = tmp_path / "gpu-report.md"
+    assert run_main(monkeypatch, "report", "-p", "/a", "--output", str(target)) == 0
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["gpu-report.md"]
+    assert target.read_text(encoding="utf-8").startswith("# GPU Stack Inspector report")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Wrote {target}." in captured.err
+    assert "Read it before you share it." in captured.err
+
+
+def test_an_existing_file_is_not_overwritten_without_force(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    target = tmp_path / "gpu-report.md"
+    target.write_text("keep me", encoding="utf-8")
+    assert run_main(monkeypatch, "report", "-p", "/a", "-o", str(target)) == 2
+    assert target.read_text(encoding="utf-8") == "keep me"
+    assert "use --force" in capsys.readouterr().err
+    assert run_main(monkeypatch, "report", "-p", "/a", "-o", str(target), "--force") == 0
+    assert target.read_text(encoding="utf-8").startswith("# GPU Stack Inspector report")
+
+
+def test_a_dash_prints_the_report(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run_main(monkeypatch, "report", "-p", "/a", "--output", "-") == 0
+    assert capsys.readouterr().out.startswith("# GPU Stack Inspector report")
