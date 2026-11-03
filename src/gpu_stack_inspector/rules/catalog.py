@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import importlib
+
 from gpu_stack_inspector.rules.engine import Registry
 
 RULES = Registry()
 
+_MODULES = ("host", "interpreters", "compatibility")
+"""Evaluation order: the machine first, then each interpreter, then how they fit together.
+Kept as data on purpose: import sorting would otherwise reorder the rules."""
+
 
 def builtin_rules() -> Registry:
-    """All built-in rules: host first, then interpreters, then compatibility."""
-    from gpu_stack_inspector.rules import host, interpreters  # noqa: F401 - register on import
-
+    """All built-in rules, in evaluation order."""
+    for name in _MODULES:
+        importlib.import_module(f"gpu_stack_inspector.rules.{name}")
     return RULES

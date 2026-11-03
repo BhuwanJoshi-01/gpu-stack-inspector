@@ -45,3 +45,10 @@ def test_the_real_rtx_3050_laptop_passes_every_host_check() -> None:
         ("GSI-SYS-002", Status.PASS),
         ("GSI-SYS-003", Status.PASS),
     ]
+
+
+def test_rules_are_evaluated_host_first_then_interpreters_then_compatibility() -> None:
+    order = ["host", "interpreters", "compatibility"]
+    modules = [rule.check.__module__.rsplit(".", 1)[-1] for rule in builtin_rules()]
+    assert modules == sorted(modules, key=order.index)
+    assert set(modules) == set(order)
