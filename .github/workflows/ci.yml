@@ -104,3 +104,14 @@ jobs:
         run: |
           uv export --frozen --no-dev --no-emit-project --format requirements-txt > requirements.txt
           uvx pip-audit --strict --requirement requirements.txt
+
+  dependency-review:
+    # Flags vulnerable or license-incompatible dependencies a pull request adds.
+    # GitHub offers it on public repositories; skipped while this one is private.
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: moderate
