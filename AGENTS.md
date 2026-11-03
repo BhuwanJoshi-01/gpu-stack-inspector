@@ -18,10 +18,19 @@ uv run pytest -q --cov                     # with coverage
 ## Layout
 
 ```
-src/gpu_stack_inspector/   the package
-tests/                     unit tests (no GPU needed), fixtures/
-docs/roadmap.md            requirement IDs GPU-001 … and what v0.1 includes
-.github/                   CI, issue forms, PR template
+src/gpu_stack_inspector/
+  cli.py          Typer app + main(): exit codes, redacted internal errors (GSI_DEBUG=1 for tracebacks)
+  models.py       Status/Severity/Confidence, Evidence, Finding (ids GSI-<AREA>-<NNN>), ProbeFailure, Snapshot
+  runner.py       CommandRunner protocol, SubprocessRunner (no shell, timeout kills the process group,
+                  capped output), probe_failure()
+  privacy.py      strip_control(), RedactionContext, Redactor (text + whole snapshots, summary)
+  exit_codes.py   ExitCode: 0 ok, 1 strict, 2 error, 3 context unavailable, 130 interrupted
+tests/
+  conftest.py     autouse no_network guard; HYPOTHESIS_PROFILE=thorough
+  fakes.py        FakeRunner: scripted commands only, anything else fails the test
+  unit/           unit tests (no GPU needed)
+docs/roadmap.md   requirement IDs GPU-001 … and what v0.1 includes
+.github/          CI, issue forms, PR template
 ```
 
 ## Rules that are easy to break
