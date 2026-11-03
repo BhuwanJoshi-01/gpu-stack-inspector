@@ -223,7 +223,11 @@ def torch_build_supports_cuda(snapshot: Snapshot, context: RuleContext) -> Itera
                 evidence=evidence,
             )
         elif build.kind is TorchBuildKind.CPU:
-            choose = f"a CUDA version up to {max_cuda}" if max_cuda else "a CUDA version"
+            choose = (
+                f"a CUDA version up to {max_cuda} (what this driver supports)"
+                if max_cuda
+                else "a CUDA version your NVIDIA driver supports"
+            )
             yield Finding(
                 id="GSI-TORCH-002",
                 status=Status.FAIL if context.cuda_expected else Status.PASS,
@@ -234,8 +238,7 @@ def torch_build_supports_cuda(snapshot: Snapshot, context: RuleContext) -> Itera
                     "here whatever the driver can do."
                 ),
                 recommended_action=(
-                    f"Install a CUDA build with the selector at {_SELECTOR}, choosing {choose} "
-                    "(what this driver supports)."
+                    f"Install a CUDA build with the selector at {_SELECTOR}, choosing {choose}."
                 ),
                 verify_command=f"gpu-stack-inspector inspect --python {interpreter.path}",
                 subject=subject,

@@ -204,3 +204,10 @@ def test_comparing_several_interpreters_is_not_second_guessed() -> None:
     other = InterpreterFacts("B", "/envs/b/bin/python", version="3.11.0")
     context = RuleContext(shell_python="/usr/bin/python3")
     assert results(HEALTHY, other, rule="GSI-ENV-002", context=context) == []
+
+
+def test_without_a_known_driver_the_cpu_build_advice_still_reads_well() -> None:
+    result = build_result(with_torch("2.15.0+cpu", **CPU_EVIDENCE))
+    assert (result.recommended_action or "").endswith(
+        "choosing a CUDA version your NVIDIA driver supports."
+    )
