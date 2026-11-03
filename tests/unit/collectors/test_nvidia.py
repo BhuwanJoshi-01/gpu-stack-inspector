@@ -166,3 +166,27 @@ def test_only_the_scripted_read_only_commands_are_run() -> None:
     runner = FakeRunner()
     with pytest.raises(UnexpectedCommandError):
         collect(runner)
+
+
+def test_blank_lines_are_ignored() -> None:
+    query = "\n" + fixture("rtx3050-laptop-595.query.csv") + "\n  \n"
+    facts = collect(scripted(query=query))
+    assert len(facts.gpus) == 1
+    assert facts.failures == ()
+
+
+@pytest.mark.parametrize(
+    "row", ["x, NVIDIA GeForce RTX 3050, 595.99.02, 4096, 8.6", "0, [N/A], 595.99.02, 4096, 8.6"]
+)
+def test_rows_without_a_usable_index_or_name_are_malformed(row: str) -> None:
+    facts = collect(scripted(query=row + "\n"))
+    assert facts.gpus == ()
+    assert [f.detail for f in facts.failures] == ["line 1 has no GPU index or name"]
+
+
+def test_output_the_csv_module_cannot_read_is_malformed() -> None:
+    huge_field = "x" * 200_000  # beyond csv's 128 KiB field limit, within the output cap
+    facts = collect(scripted(query=f"0, {huge_field}, 595.99.02, 4096, 8.6\n"))
+    assert facts.gpus == ()
+    assert facts.failures[0].kind is FailureKind.MALFORMED_OUTPUT
+    assert facts.failures[0].detail.startswith("unreadable CSV output")
