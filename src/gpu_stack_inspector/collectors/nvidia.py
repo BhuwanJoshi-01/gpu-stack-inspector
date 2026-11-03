@@ -20,6 +20,7 @@ _UNAVAILABLE = frozenset(
     {"", "n/a", "[n/a]", "not supported", "[not supported]", "[unknown error]"}
 )
 _COMPUTE_CAPABILITY = re.compile(r"[0-9]+\.[0-9]+")
+_VERSION_LINE = re.compile(r"^\s*(?P<key>[A-Za-z -]+?)\s*:\s*(?P<value>\S+)\s*$", re.MULTILINE)
 
 
 def collect_nvidia(
@@ -43,12 +44,28 @@ def collect_nvidia(
         return NvidiaFacts(smi_path=smi, failures=(failure,))
 
     gpus, driver_version, failures = _parse_query(result.stdout, _FIELDS)
+    versions = _versions(runner, smi, timeout)
     return NvidiaFacts(
         smi_path=smi,
-        driver_version=driver_version,
+        driver_version=driver_version or versions.get("driver version"),
+        max_cuda_version=versions.get("cuda version"),
         gpus=tuple(gpus),
         failures=tuple(failures),
     )
+
+
+def _versions(runner: CommandRunner, smi: str, timeout: float) -> dict[str, str]:
+    """Driver and maximum CUDA version from ``nvidia-smi --version``, keys lower-cased.
+
+    Its output looks like ``CUDA Version        : 13.2``.
+    """
+    result = runner.run([smi, "--version"], timeout=timeout, env_overrides=_ENV)
+    if not result.ok:
+        return {}
+    return {
+        match["key"].strip().lower(): match["value"]
+        for match in _VERSION_LINE.finditer(result.stdout)
+    }
 
 
 def _query_argv(smi: str, fields: Sequence[str]) -> list[str]:

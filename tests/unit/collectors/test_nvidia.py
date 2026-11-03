@@ -53,7 +53,6 @@ def test_without_nvidia_smi_nothing_runs_and_nothing_failed() -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_real_rtx_3050_laptop() -> None:
     runner = scripted()
     facts = collect(runner)
@@ -68,7 +67,6 @@ def test_real_rtx_3050_laptop() -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_commands_run_with_the_c_locale_and_a_timeout() -> None:
     runner = scripted()
     collect(runner)
