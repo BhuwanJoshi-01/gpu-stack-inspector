@@ -9,6 +9,7 @@ from gpu_stack_inspector.models import (
     FailureKind,
     Finding,
     InterpreterFacts,
+    NvidiaFacts,
     ProbeFailure,
     Snapshot,
     Status,
@@ -133,3 +134,67 @@ def test_missing_torch_with_packages_that_need_it_warns() -> None:
 def test_an_environment_simply_without_torch_is_not_applicable() -> None:
     [result] = results(HEALTHY, rule="GSI-TORCH-001")
     assert result.status is Status.NOT_APPLICABLE
+
+
+CUDA_EVIDENCE = {
+    "cuda_library": True,
+    "hip_library": False,
+    "version_py_found": True,
+    "built_cuda": "12.8",
+}
+CPU_EVIDENCE = {
+    "cuda_library": False,
+    "hip_library": False,
+    "version_py_found": True,
+    "built_cuda": None,
+}
+
+
+def build_result(env: InterpreterFacts, **snapshot_fields: object) -> Finding:
+    snapshot = Snapshot("0.1.0", "t", interpreters=(env,), **snapshot_fields)  # type: ignore[arg-type]
+    [result] = [f for f in evaluate(snapshot, builtin_rules()) if f.id == "GSI-TORCH-002"]
+    return result
+
+
+def test_a_cuda_build_passes_with_its_cuda_version() -> None:
+    result = build_result(with_torch(**CUDA_EVIDENCE))
+    assert result.status is Status.PASS
+    assert result.summary == "torch 2.11.0+cu128 is a CUDA 12.8 build"
+    assert result.evidence
+
+
+def test_a_cpu_build_fails_and_names_what_the_driver_supports() -> None:
+    nvidia = NvidiaFacts("/usr/bin/nvidia-smi", "595.99.02", "13.2")
+    result = build_result(with_torch("2.15.0+cpu", **CPU_EVIDENCE), nvidia=nvidia)
+    assert result.status is Status.FAIL
+    assert result.summary == "torch 2.15.0+cpu is a CPU-only build"
+    assert "torch.cuda.is_available() is False" in result.reason
+    assert "a CUDA version up to 13.2" in (result.recommended_action or "")
+
+
+def test_a_cpu_build_is_fine_when_cuda_is_not_expected() -> None:
+    env = with_torch("2.15.0+cpu", **CPU_EVIDENCE)
+    snapshot = Snapshot("0.1.0", "t", interpreters=(env,))
+    [result] = [
+        f
+        for f in evaluate(snapshot, builtin_rules(), RuleContext(cuda_expected=False))
+        if f.id == "GSI-TORCH-002"
+    ]
+    assert result.status is Status.PASS
+
+
+def test_rocm_is_not_judged() -> None:
+    result = build_result(with_torch("2.9.1+rocm6.4", hip_library=True, cuda_library=False))
+    assert result.status is Status.NOT_APPLICABLE
+
+
+def test_conflicting_evidence_is_unknown_with_a_reinstall_hint() -> None:
+    result = build_result(with_torch("2.11.0+cu128", **CPU_EVIDENCE))
+    assert result.status is Status.UNKNOWN
+    assert "+cu128" in result.reason
+    assert "reinstalling torch" in (result.recommended_action or "")
+
+
+def test_no_build_check_without_torch() -> None:
+    snapshot = Snapshot("0.1.0", "t", interpreters=(HEALTHY,))
+    assert [f for f in evaluate(snapshot, builtin_rules()) if f.id == "GSI-TORCH-002"] == []

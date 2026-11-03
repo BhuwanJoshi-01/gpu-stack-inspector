@@ -17,6 +17,7 @@ from gpu_stack_inspector.models import (
 )
 from gpu_stack_inspector.rules.catalog import RULES
 from gpu_stack_inspector.rules.engine import RuleContext
+from gpu_stack_inspector.rules.torch_build import TorchBuildKind, classify_torch
 
 _CANNOT_START = frozenset({FailureKind.NOT_FOUND, FailureKind.PERMISSION_DENIED})
 
@@ -187,4 +188,90 @@ def torch_installed(snapshot: Snapshot, context: RuleContext) -> Iterator[Findin
                 summary="No PyTorch in this environment",
                 reason="Nothing installed here needs it, so the PyTorch checks do not apply.",
                 subject=interpreter.label,
+            )
+
+
+_SELECTOR = "https://pytorch.org/get-started/locally/"
+
+
+@RULES.rule("GSI-TORCH-002", "The PyTorch build supports CUDA", sources=(_SELECTOR,))
+def torch_build_supports_cuda(snapshot: Snapshot, context: RuleContext) -> Iterator[Finding]:
+    """Whether the installed PyTorch is a CUDA build, judged from static evidence only.
+
+    The evidence is the version tag, torch/version.py, the CUDA libraries in torch/lib,
+    the nvidia-* requirements and conda's package records; nothing is imported. A CPU-only
+    build where CUDA is expected is the most common reason for
+    `torch.cuda.is_available()` returning False. Conflicting evidence gives "unknown",
+    never a guess. ROCm builds are named but not judged: this tool checks NVIDIA CUDA.
+    """
+    max_cuda = snapshot.nvidia.max_cuda_version if snapshot.nvidia else None
+    for interpreter in snapshot.interpreters:
+        if not _usable(interpreter) or interpreter.torch is None:
+            continue
+        build = classify_torch(interpreter.torch)
+        subject, confidence, evidence = interpreter.label, build.confidence, build.evidence
+        if build.kind is TorchBuildKind.CUDA:
+            target = f"CUDA {build.cuda_version}" if build.cuda_version else "CUDA"
+            yield Finding(
+                id="GSI-TORCH-002",
+                status=Status.PASS,
+                severity=Severity.INFO,
+                summary=f"torch {interpreter.torch.version} is a {target} build",
+                reason="The metadata of this torch shows a CUDA build. Nothing was imported.",
+                limitations=build.conflicts,
+                subject=subject,
+                confidence=confidence,
+                evidence=evidence,
+            )
+        elif build.kind is TorchBuildKind.CPU:
+            choose = f"a CUDA version up to {max_cuda}" if max_cuda else "a CUDA version"
+            yield Finding(
+                id="GSI-TORCH-002",
+                status=Status.FAIL if context.cuda_expected else Status.PASS,
+                severity=Severity.HIGH if context.cuda_expected else Severity.INFO,
+                summary=f"torch {interpreter.torch.version} is a CPU-only build",
+                reason=(
+                    "This build has no CUDA support, so torch.cuda.is_available() is False "
+                    "here whatever the driver can do."
+                ),
+                recommended_action=(
+                    f"Install a CUDA build with the selector at {_SELECTOR}, choosing {choose} "
+                    "(what this driver supports)."
+                ),
+                verify_command=f"gpu-stack-inspector inspect --python {interpreter.path}",
+                subject=subject,
+                confidence=confidence,
+                evidence=evidence,
+            )
+        elif build.kind is TorchBuildKind.ROCM:
+            yield Finding(
+                id="GSI-TORCH-002",
+                status=Status.NOT_APPLICABLE,
+                severity=Severity.INFO,
+                summary=f"torch {interpreter.torch.version} is a ROCm build",
+                reason="ROCm builds target AMD GPUs; this tool only checks NVIDIA CUDA.",
+                subject=subject,
+                confidence=confidence,
+                evidence=evidence,
+            )
+        else:
+            yield Finding(
+                id="GSI-TORCH-002",
+                status=Status.UNKNOWN,
+                severity=Severity.MEDIUM,
+                summary="The kind of PyTorch build could not be determined",
+                reason=(
+                    "; ".join(build.conflicts)
+                    if build.conflicts
+                    else "No tag, version file, library or package record says which build it is."
+                ),
+                recommended_action=(
+                    "The installation looks inconsistent; reinstalling torch in this "
+                    "environment usually fixes it."
+                    if build.conflicts
+                    else None
+                ),
+                subject=subject,
+                confidence=confidence,
+                evidence=evidence,
             )
