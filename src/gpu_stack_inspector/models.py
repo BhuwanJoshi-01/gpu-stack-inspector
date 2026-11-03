@@ -203,3 +203,12 @@ class ToolkitFacts:
     nvcc_version: str | None = None
     toolkits: tuple[CudaToolkit, ...] = ()
     failures: tuple[ProbeFailure, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentVariable:
+    """An allowlisted variable that was set. An empty value is kept: for
+    ``CUDA_VISIBLE_DEVICES`` it means "no GPU is visible"."""
+
+    name: str
+    value: str
