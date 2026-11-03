@@ -18,7 +18,7 @@ from rich.text import Text
 from gpu_stack_inspector import __version__, orchestrator
 from gpu_stack_inspector.exit_codes import ExitCode
 from gpu_stack_inspector.models import FailureKind, Snapshot
-from gpu_stack_inspector.privacy import RedactionContext, Redactor
+from gpu_stack_inspector.privacy import RedactionContext, Redactor, redact_snapshot
 from gpu_stack_inspector.reports.json_report import render_json
 from gpu_stack_inspector.reports.terminal import render_compare, render_terminal
 from gpu_stack_inspector.rules.catalog import builtin_rules
@@ -137,7 +137,7 @@ def inspect(
         orchestrator.inspect(SubprocessRunner(), pythons),
         RuleContext(shell_python=shell_python),
     )
-    redacted = Redactor(RedactionContext.current()).redact(snapshot)
+    redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
     else:
@@ -177,7 +177,7 @@ def compare(
             RuleContext(shell_python=shell_python),
         )
     )
-    redacted = Redactor(RedactionContext.current()).redact(snapshot)
+    redacted = redact_snapshot(snapshot)
     if output_format is OutputFormat.JSON:
         typer.echo(render_json(redacted), nl=False)
     else:

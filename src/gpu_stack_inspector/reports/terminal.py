@@ -36,12 +36,36 @@ def _render_header(snapshot: Snapshot, console: Console) -> None:
     console.print(_row("Toolkit", _toolkit(snapshot.toolkit)))
 
 
+_REDACTION_NAMES = {
+    "home_path": ("home path", "home paths"),
+    "user_name": ("user name", "user names"),
+    "host_name": ("host name", "host names"),
+    "secret_value": ("secret value", "secret values"),
+    "url_credentials": ("URL credential", "URL credentials"),
+    "token": ("token", "tokens"),
+}
+
+
+def redaction_line(snapshot: Snapshot) -> str | None:
+    """'Redacted from this output: 3 home paths, 1 secret value', or None if nothing was."""
+    if not snapshot.redactions:
+        return None
+    parts = []
+    for item in snapshot.redactions:
+        singular, plural = _REDACTION_NAMES.get(item.kind, (item.kind, item.kind))
+        parts.append(f"{item.count} {singular if item.count == 1 else plural}")
+    return "Redacted from this output: " + ", ".join(parts)
+
+
 def _render_failures(snapshot: Snapshot, console: Console) -> None:
     if snapshot.probe_failures:
         console.print()
         console.print(Text("Could not check:", style="bold"))
         for failure in snapshot.probe_failures:
             console.print(Text(f"  {failure.probe}: {failure.detail}"))
+    line = redaction_line(snapshot)
+    if line:
+        console.print(Text(line, style="dim"))
 
 
 def render_compare(snapshot: Snapshot, console: Console, *, show_all: bool = False) -> None:

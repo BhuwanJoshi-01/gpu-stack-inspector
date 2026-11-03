@@ -13,6 +13,7 @@ from gpu_stack_inspector.models import (
     InterpreterFacts,
     NvidiaFacts,
     ProbeFailure,
+    RedactionCount,
     Severity,
     Snapshot,
     Status,
@@ -262,3 +263,16 @@ def test_identical_environments_say_so() -> None:
         comparison=(FieldComparison("Python", ("3.12", "3.12")),),
     )
     assert "No differences in the compared fields." in render_comparison(same)
+
+
+def test_the_report_says_what_was_redacted() -> None:
+    snapshot = Snapshot(
+        "0.1.0",
+        "t",
+        redactions=(RedactionCount("home_path", 3), RedactionCount("secret_value", 1)),
+    )
+    assert "Redacted from this output: 3 home paths, 1 secret value" in render(snapshot)
+
+
+def test_nothing_is_said_when_nothing_was_redacted() -> None:
+    assert "Redacted" not in render(Snapshot("0.1.0", "t"))
