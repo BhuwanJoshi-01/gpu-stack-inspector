@@ -16,6 +16,7 @@ from gpu_stack_inspector.models import (
     Snapshot,
     ToolkitFacts,
 )
+from gpu_stack_inspector.rules.torch_build import TorchBuild, TorchBuildKind, classify_torch
 
 _INDENT = "         "
 
@@ -104,11 +105,35 @@ def _interpreter(interpreter: InterpreterFacts) -> str:
         kind.append("conda")
     if interpreter.virtualenv:
         kind.append("venv")
-    torch = next((d for d in interpreter.distributions if d.name == "torch"), None)
     wheels = sum(d.name.startswith("nvidia-") for d in interpreter.distributions)
     parts = [
         f"Python {interpreter.version} ({', '.join(kind)})",
-        f"torch {torch.version}" if torch else "no torch",
+        _torch(interpreter),
         f"{wheels} nvidia-* wheels",
     ]
     return " · ".join(parts)
+
+
+def _torch(interpreter: InterpreterFacts) -> str:
+    if interpreter.torch is None:
+        listed = next((d for d in interpreter.distributions if d.name == "torch"), None)
+        return f"torch {listed.version} (build not inspected)" if listed else "no torch"
+    return f"torch {interpreter.torch.version} ({_build(classify_torch(interpreter.torch))})"
+
+
+def _build(build: TorchBuild) -> str:
+    """Say what the metadata shows, and only that: no CUDA operation has run yet."""
+    if build.kind is TorchBuildKind.CUDA:
+        target = f"CUDA {build.cuda_version}" if build.cuda_version else "CUDA"
+        text = f"{target} build"
+    elif build.kind is TorchBuildKind.CPU:
+        text = "CPU-only build"
+    elif build.kind is TorchBuildKind.ROCM:
+        text = "ROCm build, not checked by this tool"
+    else:
+        text = "build unknown"
+    if build.conflicts:
+        text += f"; {build.conflicts[0]}"
+    elif build.kind is not TorchBuildKind.UNKNOWN and build.confidence.value != "high":
+        text += f", {build.confidence.value} confidence"
+    return text

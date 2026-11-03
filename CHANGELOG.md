@@ -17,6 +17,12 @@ explicitly given Python interpreters.
   `python` on PATH is inspected. Home paths, user and host names and secrets are
   redacted from all output. Exit code 3 when a named interpreter cannot be
   started.
+- For each interpreter, inspect says which PyTorch build it has (CUDA with the
+  CUDA version it targets, CPU-only, ROCm, or unknown when the evidence
+  disagrees), without importing torch. The evidence: the version tag,
+  `torch/version.py` read as text, the CUDA libraries in `torch/lib`, the
+  nvidia-* requirements, and conda's package records. JSON output has it as
+  `torch_build`.
 - `gpu-stack-inspector --help` and `--version`. Exit codes: 0 when the
   inspection ran (whatever it found), 1 for `--strict` failures, 2 for usage
   errors and internal errors, 3 when required context is missing, 130 for

@@ -8,6 +8,7 @@ from gpu_stack_inspector.models import (
     NvidiaFacts,
     ProbeFailure,
     Snapshot,
+    TorchFacts,
 )
 from gpu_stack_inspector.reports.json_report import render_json, snapshot_to_dict
 
@@ -67,3 +68,28 @@ def test_output_ends_with_a_newline_and_keeps_unicode_readable() -> None:
     text = render_json(snapshot)
     assert text.endswith("}\n")
     assert "~/Ünï" in text
+
+
+def test_interpreters_include_the_torch_build_verdict() -> None:
+    snapshot = Snapshot(
+        tool_version="0.1.0",
+        created_at="t",
+        interpreters=(
+            InterpreterFacts(
+                "A",
+                "p",
+                torch=TorchFacts(
+                    "2.11.0+cu128", cuda_library=True, version_py_found=True, built_cuda="12.8"
+                ),
+            ),
+            InterpreterFacts("B", "q"),
+        ),
+    )
+    first, second = snapshot_to_dict(snapshot)["interpreters"]
+    assert first["torch_build"]["kind"] == "cuda"
+    assert first["torch_build"]["cuda_version"] == "12.8"
+    assert first["torch_build"]["confidence"] == "high"
+    assert {"source": "torch/version.py", "key": "cuda", "value": "12.8"} in first["torch_build"][
+        "evidence"
+    ]
+    assert second["torch_build"]["kind"] == "missing"
