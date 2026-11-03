@@ -46,7 +46,6 @@ def scripted(*, query: str | None = None, version: str | None = None) -> FakeRun
     return runner
 
 
-@pending
 def test_without_nvidia_smi_nothing_runs_and_nothing_failed() -> None:
     facts = collect(FakeRunner(), smi=None)  # any command would raise UnexpectedCommandError
     assert facts.smi_path is None
@@ -79,7 +78,6 @@ def test_commands_run_with_the_c_locale_and_a_timeout() -> None:
         assert 0 < call.timeout <= 10
 
 
-@pending
 def test_two_different_gpus() -> None:
     facts = collect(scripted(query=fixture("two-gpus.query.csv")))
     assert [(g.index, g.name, g.memory_total_mib, g.compute_capability) for g in facts.gpus] == [
@@ -88,14 +86,12 @@ def test_two_different_gpus() -> None:
     ]
 
 
-@pending
 def test_values_reported_as_not_available_are_unknown() -> None:
     facts = collect(scripted(query=fixture("not-available.query.csv")))
     assert facts.gpus == (GpuDevice(0, "NVIDIA GeForce GTX 1050", None, None),)
     assert facts.driver_version == "470.256.02"
 
 
-@pending
 def test_driver_not_loaded_is_a_failure_and_stops_further_queries() -> None:
     runner = FakeRunner()
     runner.script(*QUERY, stdout=fixture("driver-not-loaded.stdout.txt"), returncode=9)
@@ -121,7 +117,6 @@ def test_no_devices_found_means_zero_gpus_not_a_failure() -> None:
     assert facts.max_cuda_version == "13.2"
 
 
-@pending
 def test_a_hung_nvidia_smi_is_a_timeout_failure() -> None:
     runner = FakeRunner()
     runner.script_result(CommandResult(QUERY, Outcome.TIMEOUT, duration=8.0))
@@ -152,7 +147,6 @@ def test_driver_without_version_flag_falls_back_to_the_table_header() -> None:
     assert facts.failures == ()
 
 
-@pending
 def test_unknown_max_cuda_version_is_left_unknown_when_both_sources_fail() -> None:
     runner = scripted()
     runner.script(*VERSION, stdout="Invalid combination of input arguments.\n", returncode=2)
@@ -162,7 +156,6 @@ def test_unknown_max_cuda_version_is_left_unknown_when_both_sources_fail() -> No
     assert facts.gpus  # the GPU list is still reported
 
 
-@pending
 def test_malformed_rows_are_skipped_and_reported() -> None:
     query = fixture("two-gpus.query.csv") + "garbage without commas\n2, broken, row\n"
     facts = collect(scripted(query=query))
@@ -173,7 +166,6 @@ def test_malformed_rows_are_skipped_and_reported() -> None:
     ]
 
 
-@pending
 def test_only_the_scripted_read_only_commands_are_run() -> None:
     runner = FakeRunner()
     with pytest.raises(UnexpectedCommandError):
