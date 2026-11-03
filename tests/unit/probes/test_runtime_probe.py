@@ -11,7 +11,6 @@ from gpu_stack_inspector.models import FailureKind, GpuDevice
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner, read_fixture
 
-pending = pytest.mark.xfail(strict=True, reason="GPU-008: runtime probe runner pending")
 PYTHON = "/envs/a/bin/python"
 
 
@@ -31,7 +30,6 @@ def run(**answer: Any) -> tuple[Any, FakeRunner]:
     return module().run_runtime_probe(runner, PYTHON), runner
 
 
-@pending
 def test_a_working_gpu_environment() -> None:
     facts, runner = run(stdout=read_fixture("runtime", "sapiens2.stdout.txt"))
     assert (facts.torch_version, facts.cuda_version) == ("2.11.0+cu128", "12.8")
@@ -52,21 +50,18 @@ def test_a_working_gpu_environment() -> None:
     assert str(call.cwd).startswith(tempfile.gettempdir())
 
 
-@pending
 def test_the_runtime_version_can_carry_a_tag_the_metadata_lacks() -> None:
     facts, _ = run(stdout=read_fixture("runtime", "wilor.stdout.txt"))
     assert facts.torch_version == "2.14.1+cu130"
     assert facts.tensor_ok is True
 
 
-@pending
 def test_a_cpu_only_build_is_not_available_and_not_exercised() -> None:
     facts, _ = run(stdout=read_fixture("runtime", "cpu-venv.stdout.txt"))
     assert (facts.cuda_available, facts.tensor_ok, facts.cuda_version) == (False, None, None)
     assert facts.failure is None
 
 
-@pending
 @pytest.mark.parametrize("returncode", [-11, 139])
 def test_a_segfault_names_the_step_it_happened_in(returncode: int) -> None:
     stdout = "GSI-RUNTIME-STEP import torch\nGSI-RUNTIME-STEP cuda available\n"
@@ -81,7 +76,6 @@ def test_a_segfault_names_the_step_it_happened_in(returncode: int) -> None:
     assert facts.cuda_available is None
 
 
-@pending
 def test_an_abort_is_named() -> None:
     stdout = "GSI-RUNTIME-STEP import torch\n"
     facts, _ = run(
@@ -95,7 +89,6 @@ def test_an_abort_is_named() -> None:
     assert "abort (SIGABRT)" in facts.failure.detail
 
 
-@pending
 def test_a_hang_is_a_timeout_in_the_step_it_was_in() -> None:
     stdout = (
         "GSI-RUNTIME-STEP import torch\nGSI-RUNTIME-STEP cuda available\nGSI-RUNTIME-STEP devices\n"
@@ -106,7 +99,6 @@ def test_a_hang_is_a_timeout_in_the_step_it_was_in() -> None:
     assert [(s.step, s.ok) for s in facts.steps][-1] == ("devices", False)
 
 
-@pending
 def test_a_python_error_outside_the_steps_is_explained() -> None:
     stderr = (
         "Traceback (most recent call last):\nModuleNotFoundError: No module named 'encodings'\n"
@@ -116,7 +108,6 @@ def test_a_python_error_outside_the_steps_is_explained() -> None:
     assert facts.steps == ()
 
 
-@pending
 def test_no_result_is_malformed_output() -> None:
     facts, _ = run(stdout="hello\n")
     assert facts.failure.kind is FailureKind.MALFORMED_OUTPUT
