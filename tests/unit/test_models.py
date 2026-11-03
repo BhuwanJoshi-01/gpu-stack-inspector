@@ -16,6 +16,7 @@ from gpu_stack_inspector.models import (
     Severity,
     Snapshot,
     Status,
+    TorchFacts,
     utc_timestamp,
 )
 
@@ -130,3 +131,11 @@ def test_virtualenv_is_known_only_when_both_prefixes_are() -> None:
     assert venv.virtualenv is True
     plain = InterpreterFacts(label="B", path="/usr/bin/python3", prefix="/usr", base_prefix="/usr")
     assert plain.virtualenv is False
+
+
+def test_torch_facts_default_to_unknown_evidence() -> None:
+    torch = TorchFacts(version="2.11.0+cu128")
+    assert torch.cuda_library is None
+    assert torch.version_py_found is False
+    assert torch.conda_records is None
+    assert InterpreterFacts(label="A", path="/p").torch is None
