@@ -17,6 +17,7 @@ import re
 import site
 import sys
 import sysconfig
+from typing import Callable
 
 PROTOCOL = 1
 BEGIN = "GSI-PROBE-BEGIN"
@@ -33,6 +34,7 @@ EXACT = frozenset(
     ]
 )  # fmt: skip
 PREFIXES = ("nvidia-", "cupy-cuda", "jax-cuda", "tensorrt-")
+MAX_METADATA_BYTES = 64 * 1024
 
 
 def python_facts() -> dict[str, object]:
@@ -62,7 +64,10 @@ def wanted(name: str) -> bool:
 
 def distributions() -> list[dict[str, str]]:
     """Allowlisted distributions on sys.path, read from metadata without importing them."""
-    from importlib import metadata
+    try:
+        from importlib import metadata
+    except ImportError:  # Python before 3.8
+        return scan_dist_info(sys.path)
 
     found = []
     for dist in metadata.distributions():
@@ -76,12 +81,56 @@ def distributions() -> list[dict[str, str]]:
     return sorted(found, key=lambda d: (d["name"], d["location"]))
 
 
+def scan_dist_info(paths: list[str]) -> list[dict[str, str]]:
+    """Fallback without importlib.metadata: read the headers of ``*.dist-info/METADATA``."""
+    found = []
+    for entry in paths:
+        try:
+            folders = sorted(os.listdir(entry or "."))
+        except OSError:
+            continue
+        for folder in folders:
+            if not folder.endswith(".dist-info"):
+                continue
+            headers = read_headers(os.path.join(entry, folder, "METADATA"))
+            name, version = headers.get("name"), headers.get("version")
+            if name and version and wanted(name):
+                found.append({"name": normalize(name), "version": version, "location": entry})
+    return found
+
+
+def read_headers(path: str) -> dict[str, str]:
+    """``Name:``/``Version:`` style headers up to the first blank line."""
+    headers: dict[str, str] = {}
+    try:
+        with open(path, "rb") as handle:
+            text = handle.read(MAX_METADATA_BYTES).decode("utf-8", "replace")
+    except OSError:
+        return headers
+    for line in text.splitlines():
+        if not line.strip():
+            break
+        key, separator, value = line.partition(":")
+        if separator and key.strip().lower() not in headers:
+            headers[key.strip().lower()] = value.strip()
+    return headers
+
+
+def collect(sections: list[tuple[str, Callable[[], object]]]) -> dict[str, object]:
+    """Run each section; an exception is reported and the other sections still run."""
+    errors: list[str] = []
+    result: dict[str, object] = {"protocol": PROTOCOL, "errors": errors}
+    for key, function in sections:
+        try:
+            result[key] = function()
+        except Exception as exc:  # a partial answer is worth more than none
+            result[key] = None
+            errors.append("%s: %s: %s" % (key, type(exc).__name__, exc))
+    return result
+
+
 def main() -> None:
-    result: dict[str, object] = {
-        "protocol": PROTOCOL,
-        "python": python_facts(),
-        "distributions": distributions(),
-    }
+    result = collect([("python", python_facts), ("distributions", distributions)])
     sys.stdout.write(BEGIN + json.dumps(result, ensure_ascii=True, sort_keys=True) + END + "\n")
     sys.stdout.flush()
 

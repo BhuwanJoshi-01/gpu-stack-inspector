@@ -7,6 +7,7 @@ import json
 import sys
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from gpu_stack_inspector.runner import Outcome, SubprocessRunner
 
@@ -21,6 +22,7 @@ STDLIB_ONLY = {
     "re",
     "importlib",
     "importlib.metadata",
+    "typing",
 }
 
 
@@ -99,3 +101,43 @@ def test_allowlisted_distributions_are_listed_with_their_location(tmp_path: Path
 def test_ordinary_packages_of_the_test_environment_are_not_listed() -> None:
     names = {d["name"] for d in run_probe()["distributions"]}  # type: ignore[attr-defined]
     assert not names & {"pytest", "typer", "rich", "hypothesis", "gpu-stack-inspector"}
+
+
+def program() -> dict[str, Any]:
+    """The program's functions, loaded without running main()."""
+    namespace: dict[str, Any] = {"__name__": "gsi_probe_under_test"}
+    exec(compile(SOURCE, "metadata_program.py", "exec"), namespace)  # noqa: S102 - our own file
+    return namespace
+
+
+def test_the_dist_info_fallback_reads_allowlisted_metadata(tmp_path: Path) -> None:
+    site = fake_site_packages(
+        tmp_path,
+        ("torch-1.12.0.dist-info", "torch", "1.12.0"),
+        ("six-1.16.0.dist-info", "six", "1.16.0"),
+    )
+    (site / "broken.dist-info").mkdir()  # no METADATA at all
+    found = program()["scan_dist_info"]([str(site), str(tmp_path / "missing")])
+    assert found == [{"name": "torch", "version": "1.12.0", "location": str(site)}]
+
+
+def test_metadata_headers_stop_at_the_first_blank_line(tmp_path: Path) -> None:
+    metadata = tmp_path / "METADATA"
+    metadata.write_text("Name: torch\nVersion: 2.0\n\nName: not-a-header\n", encoding="utf-8")
+    assert program()["read_headers"](str(metadata)) == {"name": "torch", "version": "2.0"}
+
+
+def test_a_failing_section_is_reported_and_the_others_still_run() -> None:
+    def broken() -> object:
+        raise OSError("disk on fire")
+
+    result = program()["collect"](
+        [("python", lambda: {"version": "3.8"}), ("distributions", broken)]
+    )
+    assert result["python"] == {"version": "3.8"}
+    assert result["distributions"] is None
+    assert result["errors"] == ["distributions: OSError: disk on fire"]
+
+
+def test_a_healthy_interpreter_reports_no_errors() -> None:
+    assert run_probe()["errors"] == []
