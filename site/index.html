@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPU Stack Inspector</title>
+  <meta name="description" content="Explain why your AI code uses the GPU in one Python environment but not another. Read-only, open source.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>GPU Stack Inspector</h1>
+    <p class="tagline">Explain why your AI code uses the GPU in one Python environment but not another.</p>
+    <p class="links">
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector">Source on GitHub</a>
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/troubleshooting.md">Troubleshooting</a>
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/support-matrix.md">Tested on</a>
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <p><code>nvidia-smi</code> shows your GPU, yet <code>torch.cuda.is_available()</code> is <code>True</code> in one
+        environment and <code>False</code> in another. GPU Stack Inspector inspects both from one command, shows what
+        differs, and says which difference matters.</p>
+      <figure>
+        <img src="assets/compare.svg" alt="compare output from a laptop with an RTX 3050: a conda environment with a CUDA 12.8 build of torch against a venv with a CPU-only build; the CPU-only build fails GSI-TORCH-002 and the comparison warns that the builds differ.">
+        <figcaption>Real output from an RTX 3050 laptop: a working conda environment against a CPU-only venv.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Install</h2>
+      <pre><code>uv tool install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector
+gpu-stack-inspector compare --python ~/envs/works/bin/python --python ~/envs/broken/bin/python</code></pre>
+      <p>Needs Python 3.11 or newer; the environments it inspects can be Python 3.8 or newer.</p>
+    </section>
+
+    <section class="promises">
+      <h2>What it promises</h2>
+      <ul>
+        <li><strong>Read-only.</strong> Nothing is installed or changed; no <code>sudo</code>; no network access.</li>
+        <li><strong>Your environments stay untouched.</strong> Metadata is read from disk. torch is only imported with
+          <code>probe --runtime</code>, which runs a 16-element operation on the GPU.</li>
+        <li><strong>Unknown is not a pass.</strong> A check that could not run never shows as green.</li>
+        <li><strong>Shareable reports.</strong> Paths, names, secrets and tokens are redacted before anything is
+          printed, and each report says what was removed.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>MIT licensed. Test reports from other machines are very welcome on
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/issues">GitHub</a>.</p>
+  </footer>
+</body>
+</html>
