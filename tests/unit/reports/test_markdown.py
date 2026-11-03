@@ -53,7 +53,7 @@ def test_a_path_with_a_pipe_does_not_break_the_tables() -> None:
         "0.1.0", "t", interpreters=(InterpreterFacts("A", "/envs/a|b/python", version="3.12.0"),)
     )
     row = next(line for line in render_markdown(snapshot).splitlines() if line.startswith("| A |"))
-    assert row.count(" | ") == 5  # six cells, the pipe inside the code span does not split one
+    assert row.count(" | ") == 6  # seven cells, the pipe inside the code span does not split one
 
 
 def test_no_problems_and_no_checks_are_said_plainly() -> None:
@@ -85,3 +85,13 @@ def test_consequences_are_not_listed_as_separate_problems() -> None:
     assert "GSI-SYS-001" in summary
     assert "GSI-SYS-002" not in summary
     assert "(follows from `GSI-SYS-001`)" in report
+
+
+def test_the_environments_table_says_whether_cuda_was_tested() -> None:
+    env = InterpreterFacts("A", "/a/python", version="3.12.0")
+    row = next(
+        line
+        for line in render_markdown(Snapshot("0.1.0", "t", interpreters=(env,))).splitlines()
+        if line.startswith("| A |")
+    )
+    assert row.endswith("| not tested |")

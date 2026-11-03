@@ -11,7 +11,7 @@ import re
 from collections import Counter
 
 from gpu_stack_inspector.models import Finding, InterpreterFacts, Snapshot, Status
-from gpu_stack_inspector.reports.terminal import redaction_line
+from gpu_stack_inspector.reports.terminal import redaction_line, runtime_summary
 from gpu_stack_inspector.rules.comparison import torch_build_label
 
 _SPECIAL = re.compile(r"([\\`*_\[\]<>|#])")
@@ -124,15 +124,16 @@ def _environments(interpreters: tuple[InterpreterFacts, ...]) -> list[str]:
     lines = [
         "## Environments",
         "",
-        "| | Path | Python | Kind | torch | Build |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| | Path | Python | Kind | torch | Build | Runtime |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for i in interpreters:
         kind = ", ".join(k for k, on in (("conda", i.conda), ("venv", i.virtualenv)) if on) or "—"
         torch = i.torch.version if i.torch else None
+        runtime = runtime_summary(i) or "not tested"
         lines.append(
             f"| {text(i.label)} | {code(i.path)} | {_cell(i.version)} | {kind} "
-            f"| {_cell(torch)} | {_cell(torch_build_label(i))} |"
+            f"| {_cell(torch)} | {_cell(torch_build_label(i))} | {text(runtime)} |"
         )
     return lines
 
