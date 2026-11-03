@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from gpu_stack_inspector.collectors.python_env import PROBE, interpreter_path
-from gpu_stack_inspector.models import Distribution, FailureKind, InterpreterFacts, ProbeFailure
+from gpu_stack_inspector.models import (
+    Distribution,
+    FailureKind,
+    InterpreterFacts,
+    ProbeFailure,
+    TorchFacts,
+)
 from gpu_stack_inspector.runner import CommandResult, CommandRunner, Outcome, probe_failure
 
 PROTOCOL = 1
@@ -88,6 +94,7 @@ def parse_probe_output(
     unexpected: list[str] = []
     values = _python_values(document.get("python"), unexpected)
     distributions = _distributions(document.get("distributions"), unexpected)
+    torch = _torch(document.get("torch"), unexpected)
     failures: list[ProbeFailure] = []
     if unexpected:
         detail = "unexpected values for: " + ", ".join(dict.fromkeys(unexpected))
@@ -100,7 +107,12 @@ def parse_probe_output(
             if isinstance(error, str)
         )
     return InterpreterFacts(
-        label, path, **values, distributions=tuple(distributions), failures=tuple(failures)
+        label,
+        path,
+        **values,
+        distributions=tuple(distributions),
+        torch=torch,
+        failures=tuple(failures),
     )
 
 
@@ -162,6 +174,42 @@ def _crash(path: Path, result: CommandResult) -> ProbeFailure:
     if len(detail) > _DETAIL_LIMIT:
         detail = detail[: _DETAIL_LIMIT - 1] + "…"
     return ProbeFailure(PROBE, FailureKind.NONZERO_EXIT, detail)
+
+
+def _torch(section: object, unexpected: list[str]) -> TorchFacts | None:
+    if section is None:
+        return None
+    if not isinstance(section, dict) or not isinstance(section.get("version"), str):
+        unexpected.append("torch")
+        return None
+
+    def optional(value: object, kind: type, key: str) -> Any:
+        if value is None or isinstance(value, kind):
+            return value
+        unexpected.append(f"torch.{key}")
+        return None
+
+    def strings(value: object, key: str) -> tuple[str, ...] | None:
+        if value is None:
+            return None
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            return tuple(value)
+        unexpected.append(f"torch.{key}")
+        return None
+
+    libraries = optional(section.get("libraries"), dict, "libraries") or {}
+    version_py = optional(section.get("version_py"), dict, "version_py")
+    return TorchFacts(
+        version=section["version"],
+        location=optional(section.get("location"), str, "location"),
+        requires_nvidia=strings(section.get("requires_nvidia"), "requires_nvidia") or (),
+        cuda_library=optional(libraries.get("cuda"), bool, "libraries.cuda"),
+        hip_library=optional(libraries.get("hip"), bool, "libraries.hip"),
+        version_py_found=version_py is not None,
+        built_cuda=optional((version_py or {}).get("cuda"), str, "version_py.cuda"),
+        built_hip=optional((version_py or {}).get("hip"), str, "version_py.hip"),
+        conda_records=strings(section.get("conda_records"), "conda_records"),
+    )
 
 
 def _failed(label: str, path: str, detail: str) -> InterpreterFacts:
