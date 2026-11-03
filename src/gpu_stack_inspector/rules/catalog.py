@@ -8,8 +8,9 @@ from gpu_stack_inspector.rules.engine import Registry
 
 RULES = Registry()
 
-_MODULES = ("host", "interpreters", "compatibility")
-"""Evaluation order: the machine first, then each interpreter, then how they fit together.
+_MODULES = ("host", "interpreters", "compatibility", "differences")
+"""Evaluation order: the machine first, then each interpreter, then how they fit together,
+then how the interpreters differ from each other.
 Kept as data on purpose: import sorting would otherwise reorder the rules."""
 
 

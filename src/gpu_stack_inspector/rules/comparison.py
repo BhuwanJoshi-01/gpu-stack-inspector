@@ -23,7 +23,8 @@ _INTERPRETER_FIELDS: tuple[tuple[str, Callable[[InterpreterFacts], str | None]],
 )
 
 
-def _torch_build(interpreter: InterpreterFacts) -> str | None:
+def torch_build_label(interpreter: InterpreterFacts) -> str | None:
+    """The build in plain words ("CUDA 12.8", "CPU only", "not installed"…)."""
     if interpreter.version is None:
         return None
     build = classify_torch(interpreter.torch)
@@ -39,7 +40,7 @@ def _torch_build(interpreter: InterpreterFacts) -> str | None:
 
 _TORCH_FIELDS: tuple[tuple[str, Callable[[InterpreterFacts], str | None]], ...] = (
     ("torch", lambda i: i.torch.version if i.torch else None),
-    ("torch build", _torch_build),
+    ("torch build", torch_build_label),
     ("torch location", lambda i: i.torch.location if i.torch else None),
 )
 
