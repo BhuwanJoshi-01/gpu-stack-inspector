@@ -175,3 +175,31 @@ class NvidiaFacts:
     """
     gpus: tuple[GpuDevice, ...] = ()
     failures: tuple[ProbeFailure, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CudaToolkit:
+    """A CUDA toolkit directory found on disk.
+
+    ``linked_from`` lists symlinks that point at it, e.g. ``/usr/local/cuda`` for the
+    default toolkit. ``version_source`` names the file the version was read from.
+    """
+
+    path: str
+    version: str | None = None
+    version_source: str | None = None
+    linked_from: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ToolkitFacts:
+    """Locally installed CUDA toolkits and the ``nvcc`` on ``PATH``.
+
+    Prebuilt PyTorch wheels bring their own CUDA runtime, so a missing toolkit is not a
+    problem by itself; it matters for compiling extensions.
+    """
+
+    nvcc_path: str | None = None
+    nvcc_version: str | None = None
+    toolkits: tuple[CudaToolkit, ...] = ()
+    failures: tuple[ProbeFailure, ...] = ()
