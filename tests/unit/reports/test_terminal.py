@@ -276,3 +276,16 @@ def test_the_report_says_what_was_redacted() -> None:
 
 def test_nothing_is_said_when_nothing_was_redacted() -> None:
     assert "Redacted" not in render(Snapshot("0.1.0", "t"))
+
+
+def test_the_runtime_result_joins_the_interpreter_line() -> None:
+    from gpu_stack_inspector.probes.runtime_probe import parse_runtime_output
+    from tests.fakes import read_fixture
+
+    runtime = parse_runtime_output(read_fixture("runtime", "sapiens2.stdout.txt"))
+    env = InterpreterFacts("A", "p", version="3.13.13", runtime=runtime)
+    line = " ".join(render(Snapshot("0.1.0", "t", interpreters=(env,))).split())
+    assert "CUDA works on NVIDIA GeForce RTX 3050 Laptop GPU" in line
+    unavailable = parse_runtime_output(read_fixture("runtime", "cpu-venv.stdout.txt"))
+    env = InterpreterFacts("A", "p", version="3.12.13", runtime=unavailable)
+    assert "CUDA unavailable" in render(Snapshot("0.1.0", "t", interpreters=(env,)))

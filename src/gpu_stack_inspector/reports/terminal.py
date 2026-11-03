@@ -178,7 +178,24 @@ def _interpreter(interpreter: InterpreterFacts) -> str:
         _torch(interpreter),
         f"{wheels} nvidia-* wheels",
     ]
+    runtime = runtime_summary(interpreter)
+    if runtime:
+        parts.append(runtime)
     return " · ".join(parts)
+
+
+def runtime_summary(interpreter: InterpreterFacts) -> str | None:
+    """What probe --runtime found, in a few words; None when it was not run."""
+    runtime = interpreter.runtime
+    if runtime is None:
+        return None
+    if runtime.tensor_ok:
+        device = runtime.devices[0].name if runtime.devices else "the GPU"
+        return f"CUDA works on {device}"
+    if runtime.cuda_available is False:
+        return "CUDA unavailable"
+    failed = next((step.step for step in runtime.steps if not step.ok), None)
+    return f"runtime check failed at '{failed}'" if failed else "runtime check failed"
 
 
 def _torch(interpreter: InterpreterFacts) -> str:
