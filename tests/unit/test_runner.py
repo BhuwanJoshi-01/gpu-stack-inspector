@@ -63,3 +63,25 @@ def test_failure_detail_is_kept_short() -> None:
     assert failure is not None
     assert len(failure.detail) == 200
     assert failure.detail.endswith("…")
+
+
+def test_failure_detail_uses_stdout_when_stderr_is_empty() -> None:
+    result = CommandResult(
+        ("nvidia-smi",),
+        Outcome.NONZERO,
+        returncode=9,
+        stdout="NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver.\n",
+    )
+    failure = probe_failure("nvidia-smi", result)
+    assert failure is not None
+    assert failure.detail == (
+        "nvidia-smi exited with code 9: "
+        "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+    )
+
+
+def test_failure_detail_prefers_stderr() -> None:
+    result = CommandResult(("x",), Outcome.NONZERO, returncode=1, stdout="out", stderr="err")
+    failure = probe_failure("x", result)
+    assert failure is not None
+    assert failure.detail == "x exited with code 1: err"
