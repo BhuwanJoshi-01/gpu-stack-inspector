@@ -7,13 +7,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from gpu_stack_inspector.models import Distribution, FailureKind
 from gpu_stack_inspector.runner import CommandResult, Outcome
 from tests.fakes import FakeRunner
-
-pending = pytest.mark.xfail(strict=True, reason="GPU-003: running the metadata probe pending")
 
 GOOD = {
     "protocol": 1,
@@ -170,7 +166,6 @@ def test_errors_reported_by_the_probe_are_kept(tmp_path: Path) -> None:
     ]
 
 
-@pending
 def test_a_crash_is_explained_by_its_exception_line(tmp_path: Path) -> None:
     stderr = (
         "Traceback (most recent call last):\n"
@@ -184,7 +179,6 @@ def test_a_crash_is_explained_by_its_exception_line(tmp_path: Path) -> None:
     )
 
 
-@pending
 def test_a_fatal_startup_error_is_explained(tmp_path: Path) -> None:
     stderr = (
         "Fatal Python error: init_fs_encoding: failed to get the Python codec of the "
@@ -196,7 +190,6 @@ def test_a_fatal_startup_error_is_explained(tmp_path: Path) -> None:
     assert facts.failures[0].detail.endswith("ModuleNotFoundError: No module named 'encodings'")
 
 
-@pending
 def test_an_interpreter_too_old_for_the_probe_is_named_as_such(tmp_path: Path) -> None:
     stderr = '  File "<string>", line 12\nSyntaxError: future feature annotations is not defined\n'
     facts, _ = run(tmp_path, stderr=stderr, returncode=1)
@@ -206,3 +199,8 @@ def test_an_interpreter_too_old_for_the_probe_is_named_as_such(tmp_path: Path) -
 def test_a_hung_interpreter_is_a_timeout(tmp_path: Path) -> None:
     facts, _ = run(tmp_path, result={"outcome": Outcome.TIMEOUT, "duration": 8.0})
     assert [f.kind for f in facts.failures] == [FailureKind.TIMEOUT]
+
+
+def test_a_crash_without_stderr_still_reports_the_exit_code(tmp_path: Path) -> None:
+    facts, _ = run(tmp_path, returncode=139)
+    assert facts.failures[0].detail.endswith("exited with code 139")

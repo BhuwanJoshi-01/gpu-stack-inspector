@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 import tempfile
 from importlib.resources import files
 from pathlib import Path
@@ -11,13 +12,16 @@ from typing import Any
 
 from gpu_stack_inspector.collectors.python_env import PROBE, interpreter_path
 from gpu_stack_inspector.models import Distribution, FailureKind, InterpreterFacts, ProbeFailure
-from gpu_stack_inspector.runner import CommandRunner, probe_failure
+from gpu_stack_inspector.runner import CommandResult, CommandRunner, Outcome, probe_failure
 
 PROTOCOL = 1
 BEGIN, END = "GSI-PROBE-BEGIN", "GSI-PROBE-END"
 TIMEOUT = 8.0
 """Starting an interpreter and reading its metadata takes about a second, even in large
 environments; a hung startup (a broken .pth file, a network mount) must not hang us."""
+
+_EXCEPTION_LINE = re.compile(r"[A-Za-z_][\w.]*(?:Error|Exception|Exit|Interrupt)\b.*")
+_DETAIL_LIMIT = 300
 
 _STRING_FIELDS = ("version", "implementation", "executable", "prefix", "base_prefix", "platform")
 _BOOL_FIELDS = ("conda", "user_site", "pythonpath_set")
@@ -52,6 +56,8 @@ def probe_interpreter(
     # say) is never imported by the probe.
     with tempfile.TemporaryDirectory(prefix="gsi-probe-") as empty:
         result = runner.run(argv, timeout=timeout, cwd=Path(empty))
+    if result.outcome is Outcome.NONZERO:
+        return InterpreterFacts(label, str(path), failures=(_crash(path, result),))
     failure = probe_failure(PROBE, result)
     if failure is not None:
         return InterpreterFacts(label, str(path), failures=(failure,))
@@ -133,6 +139,29 @@ def _distributions(section: object, unexpected: list[str]) -> list[Distribution]
         else:
             unexpected.append("distributions")
     return found
+
+
+def _crash(path: Path, result: CommandResult) -> ProbeFailure:
+    """Explain a crashed interpreter by the line that names the problem.
+
+    A traceback starts with "Traceback (most recent call last):", which says nothing;
+    the exception is on its last line. "Fatal Python error" output (a broken standard
+    library, for instance) names the underlying exception further down.
+    """
+    lines = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+    reason = next((line for line in reversed(lines) if _EXCEPTION_LINE.fullmatch(line)), None)
+    if reason is None:
+        reason = next((line for line in lines if line.startswith("Fatal Python error")), None)
+    if reason is None:
+        reason = lines[0] if lines else ""
+    detail = f"{path} exited with code {result.returncode}"
+    if reason:
+        detail += f": {reason}"
+    if reason.startswith("SyntaxError"):
+        detail += " (the probe needs Python 3.8 or newer)"
+    if len(detail) > _DETAIL_LIMIT:
+        detail = detail[: _DETAIL_LIMIT - 1] + "…"
+    return ProbeFailure(PROBE, FailureKind.NONZERO_EXIT, detail)
 
 
 def _failed(label: str, path: str, detail: str) -> InterpreterFacts:
