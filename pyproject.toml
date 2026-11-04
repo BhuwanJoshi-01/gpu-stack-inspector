@@ -9,10 +9,35 @@ authors = [
     { name = "BhuwanJoshi-01", email = "bhuwanj779@gmail.com" }
 ]
 requires-python = ">=3.11"
+keywords = ["cuda", "pytorch", "gpu", "nvidia", "conda", "venv", "diagnostics", "troubleshooting"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Hardware",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "rich>=15.0.0",
     "typer>=0.27.3",
 ]
+
+[project.urls]
+Homepage = "https://bhuwanjoshi-01.github.io/gpu-stack-inspector/"
+Documentation = "https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/troubleshooting.md"
+Source = "https://github.com/BhuwanJoshi-01/gpu-stack-inspector"
+Issues = "https://github.com/BhuwanJoshi-01/gpu-stack-inspector/issues"
+Changelog = "https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/CHANGELOG.md"
 
 [project.scripts]
 gpu-stack-inspector = "gpu_stack_inspector.cli:main"
