@@ -4,10 +4,10 @@ All notable changes to this project are listed here. Versions follow
 [Semantic Versioning](https://semver.org/); the JSON report format has its own
 `schema_version` and changes only with a new major version of the schema.
 
-## Unreleased
+## 0.1.0 (2026-11-04)
 
-Nothing released yet. The first release (0.1.0) will inspect and compare
-explicitly given Python interpreters.
+The first release: inspect and compare explicitly given Python interpreters,
+read-only. Website: https://bhuwanjoshi-01.github.io/gpu-stack-inspector/
 
 - `gpu-stack-inspector inspect [--python PATH]… [--format text|json]` reports
   the OS, the NVIDIA driver (and the newest CUDA it supports), the GPUs, CUDA
