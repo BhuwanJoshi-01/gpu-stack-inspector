@@ -20,8 +20,8 @@ explains which difference matters, with the evidence:
 The tool needs Python 3.11 or newer; the interpreters it inspects can be Python 3.8 or newer.
 
 ```bash
-uv tool install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector   # until the PyPI release
-pipx install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector      # or with pipx
+uv tool install gpu-stack-inspector
+pipx install gpu-stack-inspector          # or with pipx
 ```
 
 ## Use
