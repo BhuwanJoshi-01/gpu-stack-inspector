@@ -1,57 +1,224 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GPU Stack Inspector</title>
-  <meta name="description" content="Explain why your AI code uses the GPU in one Python environment but not another. Read-only, open source.">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Stack Inspector: why PyTorch uses the GPU in one environment and not another</title>
+<meta name="description" content="Compare several Python environments on one machine and find out why torch.cuda.is_available() is True in one and False in another. Read-only, open source, MIT.">
+<link rel="canonical" href="https://bhuwanjoshi-01.github.io/gpu-stack-inspector/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="GPU Stack Inspector">
+<meta property="og:description" content="Find out why PyTorch uses the GPU in one Python environment but not another. One command, read-only, with the evidence.">
+<meta property="og:url" content="https://bhuwanjoshi-01.github.io/gpu-stack-inspector/">
+<meta property="og:image" content="https://bhuwanjoshi-01.github.io/gpu-stack-inspector/assets/social-card.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="GPU Stack Inspector: two Python environments on one GPU, one with a CUDA build of torch and one with a CPU-only build, marked as the difference that matters.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17202e">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>GPU Stack Inspector</h1>
-    <p class="tagline">Explain why your AI code uses the GPU in one Python environment but not another.</p>
-    <p class="links">
-      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector">Source on GitHub</a>
-      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/troubleshooting.md">Troubleshooting</a>
-      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/support-matrix.md">Tested on</a>
-    </p>
-  </header>
 
-  <main>
-    <section>
-      <p><code>nvidia-smi</code> shows your GPU, yet <code>torch.cuda.is_available()</code> is <code>True</code> in one
-        environment and <code>False</code> in another. GPU Stack Inspector inspects both from one command, shows what
-        differs, and says which difference matters.</p>
-      <figure>
-        <img src="assets/compare.svg" alt="compare output from a laptop with an RTX 3050: a conda environment with a CUDA 12.8 build of torch against a venv with a CPU-only build; the CPU-only build fails GSI-TORCH-002 and the comparison warns that the builds differ.">
-        <figcaption>Real output from an RTX 3050 laptop: a working conda environment against a CPU-only venv.</figcaption>
-      </figure>
-    </section>
+<header class="masthead">
+  <div class="wrap masthead-row">
+    <a class="part" href="#top" aria-label="GPU Stack Inspector, top of the page">
+      <svg class="part-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="assets/favicon.svg#mark"/></svg>
+      <span class="part-name">GPU Stack Inspector</span>
+    </a>
+    <p class="part-rev">Datasheet, revision 0.1.0, November 2026</p>
+    <nav class="masthead-nav" aria-label="Page">
+      <a href="#install">Install</a>
+      <a href="#checks">Checks</a>
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector">GitHub</a>
+    </nav>
+  </div>
+</header>
 
-    <section>
-      <h2>Install</h2>
-      <pre><code>uv tool install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector
-gpu-stack-inspector compare --python ~/envs/works/bin/python --python ~/envs/broken/bin/python</code></pre>
-      <p>Needs Python 3.11 or newer; the environments it inspects can be Python 3.8 or newer.</p>
-    </section>
-
-    <section class="promises">
-      <h2>What it promises</h2>
-      <ul>
-        <li><strong>Read-only.</strong> Nothing is installed or changed; no <code>sudo</code>; no network access.</li>
-        <li><strong>Your environments stay untouched.</strong> Metadata is read from disk. torch is only imported with
-          <code>probe --runtime</code>, which runs a 16-element operation on the GPU.</li>
-        <li><strong>Unknown is not a pass.</strong> A check that could not run never shows as green.</li>
-        <li><strong>Shareable reports.</strong> Paths, names, secrets and tokens are redacted before anything is
-          printed, and each report says what was removed.</li>
+<main id="top">
+  <section class="intro wrap" aria-labelledby="title">
+    <div class="intro-main">
+      <h1 id="title">Why does PyTorch use the GPU in one environment and not another?</h1>
+      <p class="lede"><code>nvidia-smi</code> lists your GPU, yet <code>torch.cuda.is_available()</code> is
+        <code>True</code> in one environment and <code>False</code> in the next. GPU Stack Inspector inspects them
+        side by side from one command, finds the layer where they part ways and tells you what to change.</p>
+      <div class="command" id="install">
+        <code id="install-command">uv tool install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector</code>
+        <button class="copy" type="button" data-copy="install-command">Copy</button>
+      </div>
+      <p class="fine">Or <code>pipx install git+https://github.com/BhuwanJoshi-01/gpu-stack-inspector</code>.
+        Needs Python 3.11 or newer; the environments it inspects can be Python 3.8 or newer.</p>
+    </div>
+    <aside class="intro-side" aria-label="Summary">
+      <h2 class="side-title">Features</h2>
+      <ul class="ticks">
+        <li>Compares any number of interpreters: conda, venv, uv, system Python</li>
+        <li>Tells CUDA, CPU-only and ROCm builds of torch apart without importing it</li>
+        <li>Checks the driver against the CUDA version each build needs</li>
+        <li>Every finding comes with its evidence, a fix and a command to check it</li>
+        <li>Redacted reports you can paste into an issue</li>
       </ul>
-    </section>
-  </main>
+      <h2 class="side-title">Typical applications</h2>
+      <ul class="ticks">
+        <li>A notebook sees the GPU, a script in another venv does not</li>
+        <li>A <code>pip install</code> replaced the CUDA build with a CPU wheel</li>
+        <li>A driver too old for the newest torch</li>
+      </ul>
+    </aside>
+  </section>
 
-  <footer>
-    <p>MIT licensed. Test reports from other machines are very welcome on
-      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/issues">GitHub</a>.</p>
-  </footer>
+  <section class="figure-block wrap" aria-labelledby="diagram-title">
+    <div class="figure-head">
+      <h2 id="diagram-title"><span class="fig-no">Figure 1</span> One machine, two stacks</h2>
+      <p>Both environments share the GPU, the driver and your shell’s variables; each brings its own Python,
+        torch build and CUDA libraries. Pick a case to see where the stacks part ways. The first case is real
+        output from the test laptop; the others are what the same checks report for other inputs.</p>
+    </div>
+
+    <div class="cases" role="tablist" aria-label="Cases">
+      <button role="tab" type="button" id="case-cpu" aria-controls="diagram" aria-selected="true" data-case="cpu">A CPU-only wheel</button>
+      <button role="tab" type="button" id="case-driver" aria-controls="diagram" aria-selected="false" tabindex="-1" data-case="driver">Driver too old</button>
+      <button role="tab" type="button" id="case-hidden" aria-controls="diagram" aria-selected="false" tabindex="-1" data-case="hidden">GPU hidden</button>
+      <button role="tab" type="button" id="case-ok" aria-controls="diagram" aria-selected="false" tabindex="-1" data-case="ok">Both fine</button>
+    </div>
+
+    <div class="diagram" id="diagram" role="tabpanel" aria-labelledby="case-cpu" data-case="cpu">
+      <div class="stacks">
+        <p class="layer-label" style="grid-area: lpy">Python</p>
+        <p class="layer-label" style="grid-area: lto">PyTorch build</p>
+        <p class="layer-label" style="grid-area: lli">CUDA libraries</p>
+        <p class="layer-label" style="grid-area: lsh">Your shell</p>
+        <p class="layer-label" style="grid-area: ldr">Driver</p>
+        <p class="layer-label" style="grid-area: lgp">GPU</p>
+
+        <p class="env-head" style="grid-area: ha"><span class="env-key">A</span> <span data-field="a-path"></span></p>
+        <p class="env-head" style="grid-area: hb"><span class="env-key">B</span> <span data-field="b-path"></span></p>
+
+        <div class="block" style="grid-area: apy" data-block="a-python"></div>
+        <div class="block" style="grid-area: ato" data-block="a-torch"></div>
+        <div class="block" style="grid-area: ali" data-block="a-libs"></div>
+        <div class="block" style="grid-area: bpy" data-block="b-python"></div>
+        <div class="block" style="grid-area: bto" data-block="b-torch"></div>
+        <div class="block" style="grid-area: bli" data-block="b-libs"></div>
+
+        <p class="shared-rule" style="grid-area: sr">shared by both</p>
+
+        <div class="block block-wide" style="grid-area: shell" data-block="shell"></div>
+        <div class="block block-wide" style="grid-area: drv" data-block="driver"></div>
+        <div class="block block-wide" style="grid-area: gpu" data-block="gpu"></div>
+      </div>
+
+      <div class="verdict" aria-live="polite">
+        <p class="verdict-command"><code data-field="command"></code></p>
+        <ul class="findings" data-field="findings"></ul>
+      </div>
+    </div>
+    <noscript><p class="fine">The diagram needs JavaScript to switch cases; Figure 2 shows real output.</p></noscript>
+  </section>
+
+  <section class="wrap two-col" aria-labelledby="output-title">
+    <div>
+      <h2 id="output-title"><span class="fig-no">Figure 2</span> Typical output</h2>
+      <p>Real output from a laptop with an RTX 3050: a conda environment with a CUDA 12.8 build of torch, against a
+        uv venv where a CPU-only wheel came in. The table lists every field that differs; the findings say which
+        difference matters.</p>
+      <p>Each finding has a stable code. <code>gpu-stack-inspector rules explain GSI-TORCH-002</code> explains one in
+        full, and the <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/troubleshooting.md">troubleshooting guide</a>
+        lists the common ones.</p>
+      <h3>Commands</h3>
+<pre class="listing"><code>gpu-stack-inspector compare --python A --python B
+gpu-stack-inspector inspect --python B
+gpu-stack-inspector probe --runtime --python B
+gpu-stack-inspector report --python B --output gpu-report.md
+gpu-stack-inspector rules list</code></pre>
+      <p class="fine">Without <code>--python</code> it inspects the <code>python</code> your shell runs.
+        <code>--format json</code> gives the same data to scripts.</p>
+    </div>
+    <figure class="terminal">
+      <img src="assets/compare.svg" width="1360" height="1758" loading="lazy" alt="compare output: a table of the two environments, where the torch build is CUDA 12.8 in A and CPU only in B and fifteen nvidia CUDA wheels are missing from B, followed by the findings: FAIL GSI-TORCH-002 for the CPU-only build and WARN GSI-DIFF-001 because the builds differ.">
+    </figure>
+  </section>
+
+  <section class="wrap" aria-labelledby="ratings-title">
+    <h2 id="ratings-title">Absolute maximum ratings</h2>
+    <p class="section-lede">What the inspector does to your machine, at most. These limits hold for every command.</p>
+    <div class="table-scroll">
+      <table class="ratings">
+        <thead><tr><th scope="col">Parameter</th><th scope="col">Limit</th><th scope="col">Notes</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Packages installed, upgraded or removed</th><td class="num">0</td><td>Read-only; it never runs pip or conda.</td></tr>
+          <tr><th scope="row">Privilege</th><td class="num">your user</td><td>Never <code>sudo</code>.</td></tr>
+          <tr><th scope="row">Network requests</th><td class="num">0</td><td>No telemetry. Compatibility data ships with the tool, dated and with its source.</td></tr>
+          <tr><th scope="row">Imports of torch</th><td class="num">0</td><td>Metadata is read from disk. Only <code>probe --runtime</code> imports torch, in the target interpreter, and runs one 16-element operation on the GPU.</td></tr>
+          <tr><th scope="row">Files written</th><td class="num">1</td><td>The report you name with <code>--output</code>, and nothing else.</td></tr>
+          <tr><th scope="row">Time per interpreter</th><td class="num">8 s</td><td>Then the probe is stopped and reported as a timeout; 60 s for <code>probe --runtime</code>.</td></tr>
+          <tr><th scope="row">Checks shown as passing without running</th><td class="num">0</td><td>A check that could not run is unknown or not tested, never green.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine">Home paths, user and host names, secrets and tokens are redacted before anything is printed or
+      written, JSON included, and each report says what it removed. Details in
+      <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/privacy.md">privacy</a>.</p>
+  </section>
+
+  <section class="wrap" id="checks" aria-labelledby="checks-title">
+    <h2 id="checks-title">Characteristics</h2>
+    <p class="section-lede">Every check, by the layer it looks at. A check that depends on another one is not
+      repeated when that one fails: you see the cause, not its echoes.</p>
+    <div class="table-scroll">
+      <table class="checks">
+        <thead><tr><th scope="col">Layer</th><th scope="col">Code</th><th scope="col">Check</th></tr></thead>
+        <tbody>
+          <tr><th scope="rowgroup" rowspan="4">Machine</th><td><code>GSI-SYS-001</code></td><td>NVIDIA driver tools are installed</td></tr>
+          <tr><td><code>GSI-SYS-002</code></td><td>The NVIDIA driver answers</td></tr>
+          <tr><td><code>GSI-SYS-003</code></td><td>The driver sees a GPU</td></tr>
+          <tr><td><code>GSI-ENV-003</code></td><td><code>CUDA_VISIBLE_DEVICES</code> does not hide the GPUs</td></tr>
+          <tr><th scope="rowgroup" rowspan="4">Interpreter</th><td><code>GSI-ENV-001</code></td><td>The interpreter can be inspected</td></tr>
+          <tr><td><code>GSI-ENV-002</code></td><td>The interpreter is the one the shell runs</td></tr>
+          <tr><td><code>GSI-TORCH-001</code></td><td>PyTorch is installed</td></tr>
+          <tr><td><code>GSI-TORCH-002</code></td><td>The PyTorch build supports CUDA</td></tr>
+          <tr><th scope="rowgroup" rowspan="3">Compatibility</th><td><code>GSI-CUDA-001</code></td><td>nvcc is installed</td></tr>
+          <tr><td><code>GSI-CUDA-002</code></td><td>The driver supports nvcc’s CUDA version</td></tr>
+          <tr><td><code>GSI-CUDA-003</code></td><td>The driver supports the CUDA version PyTorch was built for</td></tr>
+          <tr><th scope="rowgroup" rowspan="1">Comparison</th><td><code>GSI-DIFF-001</code></td><td>The compared environments have the same PyTorch build</td></tr>
+          <tr><th scope="rowgroup" rowspan="2">Runtime, opt-in</th><td><code>GSI-TORCH-003</code></td><td>CUDA works at runtime</td></tr>
+          <tr><td><code>GSI-TORCH-004</code></td><td>CUDA was exercised at runtime</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wrap two-col" aria-labelledby="tested-title">
+    <div>
+      <h2 id="tested-title">Test conditions</h2>
+      <p>Validated on an Ubuntu 26.04 laptop with an RTX 3050 and driver 595.99.02, against five real environments:
+        conda and uv, Python 3.8 to 3.13, CUDA 11.3 to 13.0 builds and a CPU-only build. CI runs the test suite on
+        Linux and Windows, and the probe inside Python 3.8 to 3.10 and PyPy.</p>
+      <p>Windows and WSL with a GPU, containers and macOS are not validated yet. A
+        <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/issues/new?template=test_report.yml">test report</a>
+        from your machine moves them up the
+        <a href="https://github.com/BhuwanJoshi-01/gpu-stack-inspector/blob/main/docs/support-matrix.md">support matrix</a>.</p>
+    </div>
+    <div>
+      <h2>Related tools</h2>
+      <p>To check a single environment, <a href="https://pypi.org/project/cuda-doctor/">cuda-doctor</a>,
+        <a href="https://github.com/mitulgarg/env-doctor">env-doctor</a> and
+        <a href="https://www.cudadoc.com/docs/quickstart">cudadoc</a> may already be enough. GPU Stack Inspector is
+        for the case where one environment works and another, on the same machine, does not.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <div class="wrap colophon-row">
+    <p>MIT licensed. Made by <a href="https://github.com/BhuwanJoshi-01">Bhuwan Joshi</a>.
+      This page loads nothing from other sites.</p>
+    <p>Also by the same author: <a href="https://bhuwanjoshi-01.github.io/screenshare-doctor/">Screenshare Doctor</a>
+      and <a href="https://bhuwanjoshi-01.github.io/worktree-shield/">Worktree Shield</a>.</p>
+  </div>
+</footer>
 </body>
 </html>
